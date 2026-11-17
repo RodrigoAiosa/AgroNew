@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
+from werkzeug.exceptions import HTTPException
 
 from agroshield import report, rules, satellite, sms, weather
 from agroshield.geo import valid_latlon
@@ -50,6 +51,8 @@ def _not_found(_):
 
 @app.errorhandler(Exception)
 def _unexpected(err: Exception):
+    if isinstance(err, HTTPException):  # 405, 400 etc. mantêm o código original
+        return jsonify({"error": err.description}), err.code
     app.logger.exception("Erro inesperado")
     return jsonify({"error": "Erro interno. Tente novamente em instantes."}), 500
 
@@ -109,9 +112,6 @@ def config():
         "activities": [
             {"id": k, "label": v["label"], "icon": v["icon"]} for k, v in rules.ACTIVITIES.items()
         ],
-        "sms_send_enabled": sms.sending_enabled(),
-        "sms_number": os.environ.get("SMS_NUMBER", ""),
-        "sms_limit": sms.SMS_LIMIT,
     }
 
 
@@ -134,7 +134,6 @@ def analyze():
         "location": {"lat": lat, "lon": lon, "elevation": wx.get("elevation"),
                      "timezone": wx.get("timezone")},
         "satellite": sat,
-        "sms": sms.build_sms(result, place),
         "sources": ["Open-Meteo", "Sentinel-2 (Copernicus) via Earth Search"],
     }
     resp = jsonify(body)
@@ -149,7 +148,6 @@ def overview():
     lon = _float(request.args.get("lon"), "lon")
     if not valid_latlon(lat, lon):
         raise ApiError("Coordenadas fora do intervalo válido")
-    place = (request.args.get("name") or "").strip()[:60] or None
     f_wx = _pool.submit(weather.fetch, lat, lon)
     f_sat = _pool.submit(satellite.latest_scene, lat, lon)
     try:
@@ -166,7 +164,7 @@ def overview():
             res = rules.analyze(wx, act)
         except ValueError as exc:
             raise ApiError(str(exc), 422)
-        activities[act] = {**res, "sms": sms.build_sms(res, place)}
+        activities[act] = res
     resp = jsonify({
         "location": {"lat": lat, "lon": lon, "elevation": wx.get("elevation"),
                      "timezone": wx.get("timezone")},
@@ -190,36 +188,13 @@ def report_pdf():
     data = compute(lat, lon, activity)
     pdf = report.build_pdf(
         result=data["result"], wx=data["wx"], place=place, lat=lat, lon=lon,
-        area_ha=area_ha, satellite=data["sat"], sms_text=sms.build_sms(data["result"], place),
+        area_ha=area_ha, satellite=data["sat"],
     )
     fname = f"agroshield-{activity}-{data['result']['now'][:10]}.pdf"
     return Response(pdf, mimetype="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="{fname}"',
         "Cache-Control": "no-store",
     })
-
-
-@app.post("/api/sms/send")
-def sms_send():
-    if not sms.sending_enabled():
-        raise ApiError("O envio de SMS não está ativado neste servidor.", 503)
-    payload = request.get_json(silent=True) or {}
-    lat, lon, activity = _location_args(payload)
-    phone = sms.normalize_phone(str(payload.get("phone") or ""))
-    if not phone:
-        raise ApiError("Número de celular inválido. Use DDD + número, ex.: 66 99999-1234.")
-    ip = (request.headers.get("x-forwarded-for") or request.remote_addr or "?").split(",")[0].strip()
-    if sms.rate_limited(f"ip:{ip}") or sms.rate_limited(f"to:{phone}"):
-        raise ApiError("Muitos envios seguidos. Tente de novo em alguns minutos.", 429)
-    place = (str(payload.get("name") or "").strip()[:40]) or None
-    data = compute(lat, lon, activity)
-    text = sms.build_sms(data["result"], place)  # texto sempre gerado no servidor
-    try:
-        info = sms.send_sms(phone, text)
-    except RuntimeError as exc:
-        raise ApiError(str(exc), 502)
-    masked = phone[:3] + "•" * max(len(phone) - 7, 0) + phone[-4:]
-    return {"sent": True, "to": masked, "text": text, **info}
 
 
 def _twilio_signature_ok() -> bool:

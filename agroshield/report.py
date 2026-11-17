@@ -83,7 +83,7 @@ def _timeline_drawing(timeline: list[dict], rain: list[float], width: float) -> 
 
 def build_pdf(*, result: dict[str, Any], wx: dict[str, Any], place: str | None,
               lat: float, lon: float, area_ha: float | None,
-              satellite: dict[str, Any] | None, sms_text: str) -> bytes:
+              satellite: dict[str, Any] | None) -> bytes:
     st = _styles()
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -209,10 +209,6 @@ def build_pdf(*, result: dict[str, Any], wx: dict[str, Any], place: str | None,
     else:
         txt = "Não foi encontrada imagem Sentinel-2 recente com pouca nuvem sobre este ponto."
     story += [Paragraph(_esc(txt), st["body"])]
-
-    # SMS
-    story += [Paragraph("Versão em SMS", st["h2"]),
-              Paragraph(f"<font face='Courier'>{_esc(sms_text)}</font>", st["body"])]
 
     # Rodapé
     story += [Spacer(1, 10), Paragraph(

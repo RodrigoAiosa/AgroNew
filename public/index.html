@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>AgroShield — Posso plantar, pulverizar, adubar ou colher hoje?</title>
-  <meta name="description" content="Marque seu talhão no mapa e receba um SIM ou NÃO claro para plantar, pulverizar, adubar ou colher, com clima, solo e satélite. Relatório em PDF e resposta por SMS.">
-  <meta name="theme-color" content="#14532d">
+  <meta name="description" content="Marque seu talhão no mapa e receba um SIM ou NÃO claro para plantar, pulverizar, adubar ou colher, com clima, solo e satélite. Relatório em PDF.">
+  <meta name="theme-color" content="#0f1f17">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
@@ -13,126 +13,74 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <a class="skip" href="#resultado">Ir para a resposta</a>
+  <!-- Mapa em tela cheia -->
+  <div id="map" role="application" aria-label="Mapa de satélite em tela cheia. Toque para marcar o ponto do talhão."></div>
 
-  <header class="topbar">
-    <div class="brand">
-      <img src="icon.svg" alt="" width="32" height="32">
-      <div>
-        <strong>AgroShield</strong>
-        <span>Decisão segura no campo</span>
-      </div>
+  <div class="brand-pill glass">
+    <img src="icon.svg" alt="" width="28" height="28">
+    <strong>AgroShield</strong>
+  </div>
+
+  <div class="map-modes glass" role="group" aria-label="Como marcar no mapa">
+    <button type="button" class="chip is-active" id="modePoint" aria-pressed="true"><span aria-hidden="true">📌</span> Ponto</button>
+    <button type="button" class="chip" id="modeDraw" aria-pressed="false"><span aria-hidden="true">✏️</span> Desenhar área</button>
+  </div>
+
+  <button type="button" class="glass layer-toggle" id="layerBtn" aria-pressed="false">Mapa de ruas</button>
+
+  <!-- Resposta sempre à vista, mesmo com o menu fechado -->
+  <button type="button" class="verdict-pill" id="verdictPill" hidden></button>
+
+  <div class="draw-bar glass" id="drawBar" hidden>
+    <p id="drawHint">Toque nos cantos do talhão. Mínimo de 3 pontos.</p>
+    <div class="draw-actions">
+      <button type="button" class="btn btn-glass" id="drawUndo">Desfazer</button>
+      <button type="button" class="btn btn-primary" id="drawDone" disabled>Concluir</button>
+      <button type="button" class="btn btn-glass" id="drawCancel">Cancelar</button>
     </div>
-    <button class="btn btn-ghost" id="helpBtn" type="button">Como funciona</button>
-  </header>
+  </div>
 
-  <main class="layout">
-    <!-- PASSO 1 · ONDE -->
-    <section class="panel panel-map" aria-labelledby="t1">
-      <ol class="steps" aria-label="Etapas">
-        <li id="step1" class="is-current" aria-current="step"><span>1</span> Onde</li>
-        <li id="step2"><span>2</span> O quê</li>
-        <li id="step3"><span>3</span> Resposta</li>
-      </ol>
-      <h2 id="t1">Onde fica o talhão?</h2>
-
+  <!-- Painéis de vidro (um aberto por vez) -->
+  <div class="sheets">
+    <section class="glass sheet" id="panel-local" aria-labelledby="t-local" inert>
+      <header class="sheet-head"><h2 id="t-local">Onde fica o talhão?</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
       <form class="search" id="searchForm" role="search" autocomplete="off">
-        <label class="sr-only" for="q">Buscar cidade ou endereço</label>
-        <input id="q" type="search" inputmode="search" placeholder="Digite a cidade (ex.: Sorriso MT)"
+        <label class="sr-only" for="q">Buscar cidade ou coordenadas</label>
+        <input id="q" type="search" inputmode="search" placeholder="Cidade (ex.: Sorriso MT) ou coordenadas"
                aria-controls="suggestions" aria-expanded="false" autocomplete="off" enterkeyhint="search">
         <button class="btn btn-primary" type="submit">Buscar</button>
         <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
       </form>
-      <button class="btn btn-secondary btn-block" id="locateBtn" type="button">
-        <span aria-hidden="true">📍</span> Usar minha localização
-      </button>
-
-      <div class="mapwrap">
-        <div id="map" role="application" aria-label="Mapa de satélite. Toque para marcar o ponto do talhão."></div>
-
-        <div class="map-modes" role="group" aria-label="Como marcar no mapa">
-          <button type="button" class="chip is-active" id="modePoint" aria-pressed="true">
-            <span aria-hidden="true">📌</span> Marcar ponto
-          </button>
-          <button type="button" class="chip" id="modeDraw" aria-pressed="false">
-            <span aria-hidden="true">✏️</span> Desenhar área
-          </button>
-        </div>
-
-        <div class="draw-bar" id="drawBar" hidden>
-          <p id="drawHint">Toque nos cantos do talhão. Mínimo de 3 pontos.</p>
-          <div class="draw-actions">
-            <button type="button" class="btn btn-secondary" id="drawUndo">Desfazer</button>
-            <button type="button" class="btn btn-primary" id="drawDone" disabled>Concluir</button>
-            <button type="button" class="btn btn-ghost" id="drawCancel">Cancelar</button>
-          </div>
-        </div>
-
-        <button type="button" class="chip layer-toggle" id="layerBtn" aria-pressed="false">Ver mapa de ruas</button>
-      </div>
-
+      <button class="btn btn-glass btn-block" id="locateBtn" type="button"><span aria-hidden="true">📍</span> Usar minha localização</button>
       <p class="field-summary" id="fieldSummary" aria-live="polite">Toque no mapa ou busque uma cidade.</p>
     </section>
 
-    <div class="side">
-      <!-- PASSO 2 · O QUÊ -->
-      <section class="panel" aria-labelledby="t2">
-        <h2 id="t2">O que você quer fazer?</h2>
-        <div class="acts" role="radiogroup" aria-labelledby="t2" id="acts"></div>
-      </section>
+    <section class="glass sheet" id="panel-act" aria-labelledby="t-act" inert>
+      <header class="sheet-head"><h2 id="t-act">O que você quer fazer?</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
+      <div class="acts" role="radiogroup" aria-labelledby="t-act" id="acts"></div>
+    </section>
 
-      <!-- PASSO 3 · RESPOSTA -->
-      <section class="panel result" id="resultado" tabindex="-1" aria-labelledby="t3">
-        <h2 id="t3" class="sr-only">Resposta</h2>
-        <div id="resultBody" aria-live="polite"></div>
-      </section>
-    </div>
-  </main>
+    <section class="glass sheet sheet-result" id="panel-result" aria-labelledby="t-result" inert>
+      <header class="sheet-head"><h2 id="t-result">Resposta</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
+      <div id="resultBody" aria-live="polite"></div>
+    </section>
+  </div>
 
-  <footer class="foot">
-    <p>Dados: Open-Meteo (clima e solo) · Sentinel-2/Copernicus (satélite) · Mapa: Esri, Maxar, Earthstar Geographics · © OpenStreetMap.
-       O AgroShield apoia a decisão — confirme no campo e siga a orientação do seu agrônomo.</p>
-  </footer>
+  <!-- Menu flutuante -->
+  <nav class="dock glass" aria-label="Menu">
+    <button type="button" class="dock-btn" data-panel="local" aria-controls="panel-local" aria-expanded="false" id="dock-local"><span class="di" aria-hidden="true">📍</span><span>Local</span></button>
+    <button type="button" class="dock-btn" data-panel="act" aria-controls="panel-act" aria-expanded="false" id="dock-act"><span class="di" aria-hidden="true">🌱</span><span>Operação</span></button>
+    <button type="button" class="dock-btn" data-panel="result" aria-controls="panel-result" aria-expanded="false" id="dock-result"><span class="di" aria-hidden="true">✅</span><span>Resposta</span></button>
+    <button type="button" class="dock-btn" id="helpBtn"><span class="di" aria-hidden="true">❔</span><span>Ajuda</span></button>
+  </nav>
 
-  <!-- SMS -->
-  <dialog id="smsDialog" aria-labelledby="smsTitle">
-    <form method="dialog" class="dlg">
-      <h2 id="smsTitle">Resposta por SMS</h2>
-      <p class="muted">Texto curto, sem acentos, que cabe em 1 SMS e aparece bem em qualquer celular.</p>
-      <pre class="sms-preview" id="smsPreview" tabindex="0" aria-label="Prévia do SMS"></pre>
-      <p class="sms-count" id="smsCount"></p>
-
-      <div id="smsSendBox" hidden>
-        <label for="smsPhone">Enviar para o celular (com DDD)</label>
-        <input id="smsPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="66 99999-1234">
-        <button class="btn btn-primary btn-block" id="smsSendBtn" type="button">Enviar SMS agora</button>
-      </div>
-
-      <div class="dlg-row">
-        <a class="btn btn-secondary" id="smsOpen" href="#">Abrir no app de mensagens</a>
-        <button class="btn btn-secondary" id="smsCopy" type="button">Copiar texto</button>
-      </div>
-
-      <div class="offline-box" id="smsInbound" hidden>
-        <strong>Sem internet no campo?</strong>
-        <p>Mande um SMS para <b id="smsNumber"></b> escrevendo a operação e a cidade:</p>
-        <code>PULVERIZAR Sorriso MT</code>
-        <p class="muted">Você recebe a resposta no mesmo formato. Operações: PLANTAR, PULVERIZAR, ADUBAR, COLHER.</p>
-      </div>
-
-      <p class="status" id="smsStatus" role="status"></p>
-      <button class="btn btn-ghost btn-block" value="close">Fechar</button>
-    </form>
-  </dialog>
-
-  <!-- AJUDA -->
-  <dialog id="helpDialog" aria-labelledby="helpTitle">
+  <dialog id="helpDialog" class="glass" aria-labelledby="helpTitle">
     <form method="dialog" class="dlg">
       <h2 id="helpTitle">Como funciona</h2>
       <ol class="help-list">
-        <li><b>Marque o talhão.</b> Busque a cidade, use o GPS, toque no mapa ou desenhe a área.</li>
-        <li><b>Escolha a operação.</b> Plantar, pulverizar, adubar ou colher.</li>
-        <li><b>Leia a resposta.</b> SIM ou NÃO, o motivo em uma frase e a próxima janela boa.</li>
+        <li><b>Local.</b> Busque a cidade, use o GPS, toque no mapa ou desenhe a área.</li>
+        <li><b>Operação.</b> Plantar, pulverizar, adubar ou colher.</li>
+        <li><b>Resposta.</b> SIM ou NÃO, o motivo em uma frase, a próxima janela boa e o relatório em PDF.</li>
       </ol>
       <h3>Como ler as cores</h3>
       <ul class="legend">
@@ -143,6 +91,7 @@
       <h3>Limites importantes</h3>
       <p class="muted">Clima e solo vêm de modelos numéricos com cerca de 10 km de resolução e valem para o centro da área marcada.
         Os limites (vento, chuva, umidade) são referências gerais de campo: bula do produto e agrônomo mandam.</p>
+      <p class="muted small">Dados: Open-Meteo · Sentinel-2/Copernicus · Mapa: Esri, Maxar, Earthstar Geographics · © OpenStreetMap.</p>
       <button class="btn btn-primary btn-block" value="close">Entendi</button>
     </form>
   </dialog>

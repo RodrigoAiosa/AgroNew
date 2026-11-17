@@ -64,12 +64,6 @@ def test_parse_command(body, expected):
     assert sms.parse_command(body) == expected
 
 
-def test_phone_normalization():
-    assert sms.normalize_phone("(66) 99999-1234") == "+5566999991234"
-    assert sms.normalize_phone("+1 415 555 0100") == "+14155550100"
-    assert sms.normalize_phone("123") is None
-
-
 def test_polygon_area():
     # ~1 km x 1 km perto do equador = ~100 ha
     d = 0.009
@@ -117,7 +111,5 @@ def test_inbound_sms(client):
     assert b"PULVERIZAR" in client.get("/api/sms/inbound?Body=ajuda&format=text").data
 
 
-def test_sms_send_disabled_without_credentials(client, monkeypatch):
-    monkeypatch.delenv("TWILIO_ACCOUNT_SID", raising=False)
-    r = client.post("/api/sms/send", json={"phone": "66999991234", "lat": -12.5, "lon": -55.7, "activity": "colher"})
-    assert r.status_code == 503
+def test_sms_send_route_removed(client):
+    assert client.post('/api/sms/send', json={}).status_code in (404, 405)

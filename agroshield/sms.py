@@ -1,22 +1,15 @@
 """Modo SMS: texto curto (<= 160 caracteres, só ASCII) e comandos recebidos.
 
-Dois usos:
-  1. Enviar o resultado de uma análise para um celular (Twilio, opcional).
-  2. Receber um SMS de quem está sem internet, por exemplo
+Resposta a SMS recebido de quem está sem internet, por exemplo
          PULVERIZAR Sorriso MT
          COLHER -12.54 -55.72
      e responder com a decisão (webhook /api/sms/inbound).
 """
 from __future__ import annotations
 
-import os
 import re
-import threading
-import time
 import unicodedata
 from typing import Any
-
-import requests
 
 from . import rules
 from .geo import valid_latlon
@@ -112,70 +105,6 @@ def parse_command(body: str) -> dict[str, Any]:
     if coords:
         return {"activity": activity, "coords": coords}
     return {"activity": activity, "place": rest.title()}
-
-
-# --------------------------------------------------------------------------
-# Envio (Twilio)
-# --------------------------------------------------------------------------
-_sent: dict[str, list[float]] = {}
-_lock = threading.Lock()
-RATE_WINDOW_S = 3600
-RATE_MAX = 5
-
-
-def sending_enabled() -> bool:
-    return all(os.environ.get(k) for k in
-               ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN")) and bool(
-        os.environ.get("TWILIO_FROM") or os.environ.get("TWILIO_MESSAGING_SERVICE_SID"))
-
-
-def normalize_phone(raw: str) -> str | None:
-    """Converte para E.164. Sem '+', assume Brasil (+55)."""
-    digits = re.sub(r"\D", "", raw or "")
-    if not digits:
-        return None
-    if (raw or "").strip().startswith("+"):
-        return "+" + digits if 8 <= len(digits) <= 15 else None
-    if digits.startswith("55") and len(digits) in (12, 13):
-        return "+" + digits
-    if len(digits) in (10, 11):
-        return "+55" + digits
-    return None
-
-
-def rate_limited(key: str) -> bool:
-    now = time.time()
-    with _lock:
-        hits = [t for t in _sent.get(key, []) if now - t < RATE_WINDOW_S]
-        if len(hits) >= RATE_MAX:
-            _sent[key] = hits
-            return True
-        hits.append(now)
-        _sent[key] = hits
-        if len(_sent) > 2000:
-            _sent.pop(next(iter(_sent)))
-    return False
-
-
-def send_sms(to: str, body: str) -> dict[str, Any]:
-    """Envia via Twilio REST. Levanta RuntimeError em falha."""
-    sid = os.environ["TWILIO_ACCOUNT_SID"]
-    token = os.environ["TWILIO_AUTH_TOKEN"]
-    data = {"To": to, "Body": body}
-    if os.environ.get("TWILIO_MESSAGING_SERVICE_SID"):
-        data["MessagingServiceSid"] = os.environ["TWILIO_MESSAGING_SERVICE_SID"]
-    else:
-        data["From"] = os.environ["TWILIO_FROM"]
-    try:
-        resp = requests.post(
-            f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json",
-            data=data, auth=(sid, token), timeout=10,
-        )
-    except requests.RequestException as exc:
-        raise RuntimeError("Falha de rede ao enviar o SMS") from exc
-    if resp.status_code >= 300:
-        raise RuntimeError(f"O provedor recusou o SMS (HTTP {resp.status_code})")
-    return {"sid": resp.json().get("sid"), "status": resp.json().get("status")}
 
 
 def twiml(message: str) -> str:

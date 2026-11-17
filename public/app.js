@@ -18,8 +18,8 @@
   const state = {
     lat: null, lon: null, name: '', areaHa: null, polygon: null,
     activity: null, data: null, dataKey: null, stale: null,
-    config: { activities: FALLBACK_ACTS, sms_send_enabled: false, sms_number: '', sms_limit: 160 },
-    reqId: 0, controller: null,
+    config: { activities: FALLBACK_ACTS },
+    reqId: 0, controller: null, restoring: false,
   };
   const cache = new Map();
 
@@ -70,7 +70,7 @@
       updateSummary(); persist(); scheduleRefresh();
     });
     if (fly) map.flyTo(latlng, Math.max(map.getZoom(), zoom), { animate: !reduceMotion });
-    updateSummary(); persist(); updateSteps(); scheduleRefresh(0);
+    afterLocation();
   }
 
   function polygonArea(latlngs) {
@@ -89,7 +89,12 @@
     state.areaHa = polygonArea(latlngs);
     if (name !== undefined) state.name = name;
     map.fitBounds(poly.getBounds(), { padding: [30, 30], animate: !reduceMotion });
+    afterLocation();
+  }
+
+  function afterLocation() {
     updateSummary(); persist(); updateSteps(); scheduleRefresh(0);
+    if (!state.restoring) { if (state.activity) closePanel(); else openPanel('act'); }
   }
 
   function updateSummary() {
@@ -118,6 +123,8 @@
       drawError: { color: '#dc2626', message: 'Os lados não podem se cruzar.' },
     });
     drawer.enable();
+    closePanel();
+    document.body.classList.add('drawing');
     setMode('draw');
     drawBar.hidden = false;
     $('#drawDone').disabled = true;
@@ -126,6 +133,7 @@
   function stopDraw() {
     if (drawer) { try { drawer.disable(); } catch { /* já desligado */ } drawer = null; }
     drawBar.hidden = true;
+    document.body.classList.remove('drawing');
     setMode('point');
   }
   map.on(L.Draw.Event.DRAWVERTEX, (e) => {
@@ -136,10 +144,10 @@
   map.on(L.Draw.Event.CREATED, (e) => {
     ignoreClickUntil = Date.now() + 500;
     const latlngs = e.layer.getLatLngs()[0];
-    drawer = null; drawBar.hidden = true; setMode('point');
+    drawer = null; drawBar.hidden = true; document.body.classList.remove('drawing'); setMode('point');
     setPolygon(latlngs);
   });
-  map.on(L.Draw.Event.DRAWSTOP, () => { drawer = null; drawBar.hidden = true; setMode('point'); ignoreClickUntil = Date.now() + 500; });
+  map.on(L.Draw.Event.DRAWSTOP, () => { drawer = null; drawBar.hidden = true; document.body.classList.remove('drawing'); setMode('point'); ignoreClickUntil = Date.now() + 500; });
   $('#modeDraw').addEventListener('click', startDraw);
   $('#modePoint').addEventListener('click', stopDraw);
   $('#drawUndo').addEventListener('click', () => drawer && drawer.deleteLastVertex());
@@ -222,7 +230,7 @@
     if (e.target.name !== 'activity') return;
     state.activity = e.target.value;
     persist(); updateSteps();
-    if (state.data) { render(); scrollToResult(); } else { scheduleRefresh(0); }
+    if (state.data) { render(); openPanel('result'); } else { scheduleRefresh(0); }
   });
   function updateTags() {
     for (const a of state.config.activities) {
@@ -235,12 +243,45 @@
   }
 
   function updateSteps() {
-    const has = state.lat != null; const act = !!state.activity;
-    const set = (id, cur, done) => { const el = $(id); el.classList.toggle('is-current', cur); el.classList.toggle('is-done', done); if (cur) el.setAttribute('aria-current', 'step'); else el.removeAttribute('aria-current'); };
-    set('#step1', !has, has);
-    set('#step2', has && !act, has && act);
-    set('#step3', has && act, false);
+    $('#dock-local').dataset.done = String(state.lat != null);
+    $('#dock-act').dataset.done = String(!!state.activity);
+    $('#dock-result').dataset.done = String(!!(state.data && state.activity));
   }
+
+  /* ------------------------------------------------------- menu flutuante */
+  const panels = { local: $('#panel-local'), act: $('#panel-act'), result: $('#panel-result') };
+  let openId = null;
+  function openPanel(id) {
+    openId = id;
+    for (const [k, el] of Object.entries(panels)) {
+      const on = k === id;
+      el.classList.toggle('open', on);
+      if (on) el.removeAttribute('inert'); else el.setAttribute('inert', '');
+      $('#dock-' + k).setAttribute('aria-expanded', String(on));
+    }
+    document.body.classList.add('sheet-open');
+  }
+  function closePanel() {
+    openId = null;
+    for (const [k, el] of Object.entries(panels)) {
+      el.classList.remove('open'); el.setAttribute('inert', '');
+      $('#dock-' + k).setAttribute('aria-expanded', 'false');
+    }
+    document.body.classList.remove('sheet-open');
+  }
+  document.querySelectorAll('.dock-btn[data-panel]').forEach((b) =>
+    b.addEventListener('click', () => (openId === b.dataset.panel ? closePanel() : openPanel(b.dataset.panel))));
+  document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closePanel));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openId && !$('#helpDialog').open) closePanel(); });
+
+  const pill = $('#verdictPill');
+  function updatePill(r) {
+    if (!r) { pill.hidden = true; return; }
+    pill.className = 'verdict-pill ' + (r.go ? 'go' : 'no');
+    pill.innerHTML = `<span aria-hidden="true">${r.go ? '✓' : '✕'}</span>${esc(r.headline)}`;
+    pill.hidden = false;
+  }
+  pill.addEventListener('click', () => openPanel('result'));
 
   /* -------------------------------------------------------------- análise */
   let refreshTimer = null;
@@ -272,7 +313,7 @@
       cache.set(key, { t: Date.now(), data: body });
       state.data = body; state.dataKey = key; state.stale = null;
       try { localStorage.setItem(STORE_KEY + ':last', JSON.stringify({ t: Date.now(), key, data: body })); } catch { /* sem storage */ }
-      updateTags(); render(); scrollToResult();
+      updateTags(); render(); if (!state.restoring && state.activity) openPanel('result');
     } catch (err) {
       if (err.name === 'AbortError' || id !== state.reqId) return;
       const last = readLast(key);
@@ -285,11 +326,6 @@
     try { const v = JSON.parse(localStorage.getItem(STORE_KEY + ':last')); return v && v.key === key ? v : null; } catch { return null; }
   }
 
-  function scrollToResult() {
-    if (matchMedia('(min-width: 960px)').matches) return;
-    $('#resultado').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
-  }
-
   /* ------------------------------------------------------------- renderização */
   const body = $('#resultBody');
   const STATUS_LABEL = { ok: 'Ok', warn: 'Atenção', fail: 'Impede', info: 'Info' };
@@ -297,15 +333,18 @@
 
   function renderEmpty(custom) {
     const msg = custom || (state.lat == null ? 'Marque o talhão no mapa para começar.' : 'Agora escolha o que quer fazer.');
+    updatePill(null);
     body.innerHTML = `<div class="empty"><span class="big" aria-hidden="true">🌾</span><p><strong>${msg}</strong></p><p>A resposta — SIM ou NÃO — aparece aqui.</p></div>`;
   }
   function renderLoading() {
+    updatePill(null);
     body.innerHTML = '<div class="skeleton" aria-busy="true"><p class="sr-only">Calculando…</p><div class="bar big"></div><div class="bar"></div><div class="grid2"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div></div>';
   }
   function renderError(msg) {
-    const sms = state.config.sms_number ? `<p>Sem internet? Mande um SMS para <b>${esc(state.config.sms_number)}</b>, ex.: <code>${esc((state.activity || 'PULVERIZAR').toUpperCase())} Sorriso MT</code></p>` : '';
-    body.innerHTML = `<div class="error"><div class="big" aria-hidden="true">📡</div><p><strong>Não consegui buscar os dados agora.</strong></p><p class="muted">${esc(msg)}</p><button class="btn btn-primary" id="retryBtn" type="button">Tentar de novo</button>${sms}</div>`;
+    updatePill(null);
+    body.innerHTML = `<div class="error"><div class="big" aria-hidden="true">📡</div><p><strong>Não consegui buscar os dados agora.</strong></p><p class="muted">${esc(msg)}</p><button class="btn btn-primary" id="retryBtn" type="button">Tentar de novo</button></div>`;
     $('#retryBtn').addEventListener('click', () => scheduleRefresh(0));
+    if (!state.restoring) openPanel('result');
   }
 
   function whenLine(r) {
@@ -331,7 +370,7 @@
 
   function render() {
     const r = state.data && state.activity && state.data.activities[state.activity];
-    if (!r) return renderEmpty();
+    if (!r) { updatePill(null); return renderEmpty(); }
     const stale = state.stale ? `<div class="banner" role="status">Sem conexão: mostrando dados salvos às ${new Date(state.stale).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.</div>` : '';
     const cautions = r.cautions && r.cautions.length ? `<div class="caution"><strong>Atenção</strong><ul>${r.cautions.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></div>` : '';
     const tiles = r.tiles.map((t) => `<div class="tile ${t.status}"><div class="lab"><span aria-hidden="true">${t.icon}</span>${esc(t.label)}</div><div class="val">${esc(t.value)}</div><div class="sub">${esc(t.sub)}</div><span class="st">${STATUS_LABEL[t.status] || ''}</span></div>`).join('');
@@ -350,11 +389,10 @@
       <details class="why-box"><summary>Por que essa resposta?</summary><ul>${checks}</ul></details>
       ${satHtml(state.data.satellite)}
       <div class="actions">
-        <button class="btn btn-primary" id="pdfBtn" type="button"><span aria-hidden="true">📄</span> Baixar relatório (PDF)</button>
-        <button class="btn btn-secondary" id="smsBtn" type="button"><span aria-hidden="true">💬</span> Enviar por SMS</button>
+        <button class="btn btn-primary btn-block" id="pdfBtn" type="button"><span aria-hidden="true">📄</span> Baixar relatório (PDF)</button>
       </div>`;
     $('#pdfBtn').addEventListener('click', (e) => downloadPdf(e.currentTarget));
-    $('#smsBtn').addEventListener('click', openSms);
+    updatePill(r);
     updateSteps();
   }
 
@@ -382,44 +420,6 @@
     }
   }
 
-  /* -------------------------------------------------------------------- SMS */
-  const smsDlg = $('#smsDialog');
-  function openSms() {
-    const r = state.data.activities[state.activity];
-    const text = r.sms;
-    $('#smsPreview').textContent = text;
-    $('#smsCount').textContent = `${text.length}/${state.config.sms_limit} caracteres — cabe em 1 SMS.`;
-    $('#smsStatus').textContent = ''; $('#smsStatus').className = 'status';
-    $('#smsOpen').href = `sms:?&body=${encodeURIComponent(text)}`;
-    $('#smsSendBox').hidden = !state.config.sms_send_enabled;
-    $('#smsInbound').hidden = !state.config.sms_number;
-    $('#smsNumber').textContent = state.config.sms_number;
-    try { const p = localStorage.getItem(STORE_KEY + ':phone'); if (p) $('#smsPhone').value = p; } catch { /* ok */ }
-    smsDlg.showModal();
-  }
-  $('#smsCopy').addEventListener('click', async () => {
-    const st = $('#smsStatus');
-    try { await navigator.clipboard.writeText($('#smsPreview').textContent); st.textContent = 'Texto copiado.'; st.className = 'status okk'; }
-    catch { st.textContent = 'Não deu para copiar. Selecione o texto acima.'; st.className = 'status err'; }
-  });
-  $('#smsSendBtn').addEventListener('click', async (e) => {
-    const btn = e.currentTarget; const st = $('#smsStatus');
-    const phone = $('#smsPhone').value.trim();
-    if (!phone) { st.textContent = 'Digite o número com DDD.'; st.className = 'status err'; return; }
-    btn.disabled = true; st.textContent = 'Enviando…'; st.className = 'status';
-    try {
-      const res = await fetch('/api/sms/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, lat: state.lat, lon: state.lon, activity: state.activity, name: state.name }),
-      });
-      const out = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(out.error || 'Falha ao enviar');
-      try { localStorage.setItem(STORE_KEY + ':phone', phone); } catch { /* ok */ }
-      st.textContent = `SMS enviado para ${out.to}.`; st.className = 'status okk';
-    } catch (err) { st.textContent = err.message; st.className = 'status err'; }
-    finally { btn.disabled = false; }
-  });
-
   /* ------------------------------------------------------------------ ajuda */
   $('#helpBtn').addEventListener('click', () => $('#helpDialog').showModal());
 
@@ -433,6 +433,7 @@
     } catch { /* sem storage */ }
   }
   function restore() {
+    state.restoring = true;
     try {
       const s = JSON.parse(localStorage.getItem(STORE_KEY));
       if (!s || s.lat == null) return;
@@ -444,6 +445,7 @@
         map.setView([s.lat, s.lon], 14);
       }
     } catch { /* ignora estado inválido */ }
+    setTimeout(() => { state.restoring = false; }, 1500);
   }
 
   /* ----------------------------------------------------------------- início */
@@ -454,6 +456,7 @@
       if (res.ok) { state.config = { ...state.config, ...(await res.json()) }; renderActs(); }
     } catch { /* usa padrão */ }
     restore();
+    if (state.lat == null) openPanel('local');
     if (state.activity) { const el = $('#act-' + state.activity); if (el) el.checked = true; }
     updateSteps();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -26,7 +26,13 @@
     <button type="button" class="chip" id="modeDraw" aria-pressed="false"><span aria-hidden="true">✏️</span> Desenhar área</button>
   </div>
 
-  <button type="button" class="glass layer-toggle" id="layerBtn" aria-pressed="false">Mapa de ruas</button>
+  <div class="glass layer-switch" id="layerSwitch" role="radiogroup" aria-label="Camada do mapa">
+    <button type="button" class="chip is-active" role="radio" aria-checked="true" data-layer="esri" title="Imagem de alta resolução, data varia (meses ou anos)">Esri</button>
+    <button type="button" class="chip" role="radio" aria-checked="false" data-layer="s2" title="Sentinel-2: mosaico das imagens mais recentes (30 dias, até 30% de nuvem)">Sentinel-2</button>
+    <button type="button" class="chip" role="radio" aria-checked="false" data-layer="ndvi" title="NDVI: vigor da vegetação (Sentinel-2)">NDVI</button>
+    <button type="button" class="chip" role="radio" aria-checked="false" data-layer="streets">Ruas</button>
+  </div>
+  <p class="layer-note glass" id="layerNote" hidden></p>
 
   <!-- Resposta sempre à vista, mesmo com o menu fechado -->
   <button type="button" class="verdict-pill" id="verdictPill" hidden></button>

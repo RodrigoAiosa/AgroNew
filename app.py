@@ -106,9 +106,13 @@ def health():
     return {"ok": True, "demo": os.environ.get("AGRONEW_DEMO") == "1"}
 
 
+DEFAULT_SH_INSTANCE = "3f781948-5443-43f6-a7bf-350b6448547a"  # ID público (não é segredo)
+
+
 @app.get("/api/config")
 def config():
     return {
+        "sentinel_instance_id": os.environ.get("SENTINEL_HUB_INSTANCE_ID", DEFAULT_SH_INSTANCE),
         "activities": [
             {"id": k, "label": v["label"], "icon": v["icon"]} for k, v in rules.ACTIVITIES.items()
         ],

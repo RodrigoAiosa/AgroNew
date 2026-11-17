@@ -11,6 +11,7 @@ Python (Flask) + front-end estático, pronto para a **Vercel**.
   vento, rajadas, chuva nas próximas horas, umidade e temperatura do solo, temperatura e umidade do ar.
 - **Resposta objetiva**: SIM/NÃO, motivo, risco (baixo/médio/alto), faixa de 48 h (verde/amarelo/vermelho) e próxima janela boa.
 - **Dados**: [Open-Meteo](https://open-meteo.com/en/docs) (clima + umidade/temperatura do solo) e **Sentinel-2** via [Earth Search](https://github.com/Element84/earth-search) (cena de satélite mais recente com pouca nuvem).
+- **Camadas do mapa**: Esri (alta resolução, data variável), **Sentinel-2** (mosaico dos últimos 30 dias, até 30% de nuvem) e **NDVI**, via Copernicus Data Space (Sentinel Hub, WMS), mais mapa de ruas. Configure `SENTINEL_HUB_INSTANCE_ID` (o ID já vem preenchido por padrão).
 - **PDF** limpo de 1 página (`POST /api/report.pdf`).
 - **SMS para quem está sem internet** (sem botão no app): o produtor manda `PULVERIZAR Sorriso MT` (ou `COLHER -12.54 -55.72`) para o número do projeto e recebe a decisão de volta em até 160 caracteres, sem acentos (webhook `/api/sms/inbound`, Twilio, opcional).
 - **Funciona com sinal fraco**: service worker guarda o app; a última resposta fica salva no aparelho.
@@ -72,6 +73,6 @@ Sem internet para as APIs? `AGRONEW_DEMO=1 python app.py` usa dados sintéticos
 ## Limites e honestidade dos dados
 
 - Clima e solo são **modelos numéricos (~10 km)** e valem para o **centro** da área marcada. A umidade do solo é uma estimativa de modelo, não uma medição de sensor.
-- O satélite entra como **imagem de fundo** e como **a cena Sentinel-2 mais recente com pouca nuvem**. O app **ainda não calcula NDVI** sobre o talhão (próximo passo natural: ler as bandas B04/B08 do COG por requisição de faixa).
+- O satélite entra como **imagem de fundo** e como **a cena Sentinel-2 mais recente com pouca nuvem**. O NDVI aparece só como **camada visual** no mapa; o app **ainda não calcula um valor de NDVI** do talhão (próximo passo natural: ler as bandas B04/B08 do COG por requisição de faixa).
 - Os limites em `rules.LIMITS` são referências gerais de campo (por exemplo, pulverizar com vento de 3 a 10 km/h, abaixo de ~30 °C e umidade do ar acima de ~55%). Ajuste por cultura, solo e produto; bula e agrônomo têm a palavra final.
 - Uso comercial do Open-Meteo exige chave (`OPEN_METEO_API_KEY`). Os mapas Esri e OpenStreetMap exigem atribuição (já exibida) e têm termos de uso próprios.

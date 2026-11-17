@@ -32,6 +32,27 @@
   const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '© OpenStreetMap',
   });
+  // Sentinel-2 recente via Copernicus Data Space (Sentinel Hub, WMS). Sobre a Esri: onde não
+  // houver imagem limpa nos últimos 30 dias, o fundo da Esri aparece.
+  const SH_ATTR = 'Copernicus Sentinel (' + new Date().getFullYear() + ') · Sentinel Hub';
+  function shLayer(layer) {
+    const id = state.config.sentinel_instance_id;
+    if (!id) return null;
+    const end = new Date(); const start = new Date(end.getTime() - 30 * 86400000);
+    const iso = (d) => d.toISOString().slice(0, 10);
+    return L.tileLayer.wms(`https://sh.dataspace.copernicus.eu/ogc/wms/${id}`, {
+      layers: layer, format: 'image/png', transparent: true, version: '1.3.0',
+      tileSize: 512, zoomOffset: -1, maxNativeZoom: 17, maxZoom: 19, attribution: SH_ATTR,
+      TIME: `${iso(start)}/${iso(end)}`, MAXCC: 30, PRIORITY: 'mostRecent',
+    });
+  }
+  let overlay = null;
+  const LAYER_NOTES = {
+    esri: '',
+    s2: 'Sentinel-2: mosaico das imagens mais recentes dos últimos 30 dias (até 30% de nuvem). Pode misturar datas; onde não há imagem limpa, aparece a Esri.',
+    ndvi: 'NDVI: índice de vigor da vegetação (Sentinel-2, últimos 30 dias). Só faz sentido sobre áreas com plantas.',
+    streets: '',
+  };
   const fieldLayer = L.featureGroup().addTo(map);
   Object.assign(L.drawLocal.draw.handlers.polygon.tooltip, {
     start: 'Toque para marcar o primeiro canto.',
@@ -42,11 +63,27 @@
   let drawer = null;
   let ignoreClickUntil = 0;
 
-  $('#layerBtn').addEventListener('click', (e) => {
-    const onStreets = map.hasLayer(streetLayer);
-    if (onStreets) { map.removeLayer(streetLayer); satLayer.addTo(map); } else { map.removeLayer(satLayer); streetLayer.addTo(map); }
-    e.currentTarget.setAttribute('aria-pressed', String(!onStreets));
-    e.currentTarget.textContent = onStreets ? 'Ver mapa de ruas' : 'Ver satélite';
+  function setLayer(mode) {
+    if (overlay) { map.removeLayer(overlay); overlay = null; }
+    if (mode === 'streets') { map.removeLayer(satLayer); streetLayer.addTo(map); }
+    else {
+      map.removeLayer(streetLayer); if (!map.hasLayer(satLayer)) satLayer.addTo(map);
+      if (mode === 's2' || mode === 'ndvi') {
+        overlay = shLayer(mode === 's2' ? 'TRUE_COLOR' : 'VEGETATION_INDEX');
+        if (overlay) overlay.addTo(map);
+      }
+    }
+    document.querySelectorAll('#layerSwitch .chip').forEach((b) => {
+      const on = b.dataset.layer === mode;
+      b.classList.toggle('is-active', on); b.setAttribute('aria-checked', String(on));
+    });
+    const note = $('#layerNote');
+    note.textContent = LAYER_NOTES[mode] || ''; note.hidden = !LAYER_NOTES[mode];
+    try { localStorage.setItem(STORE_KEY + ':layer', mode); } catch { /* sem storage */ }
+  }
+  $('#layerSwitch').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-layer]');
+    if (b) setLayer(b.dataset.layer);
   });
 
   map.on('click', (e) => {
@@ -362,7 +399,8 @@
   }
 
   function satHtml(s) {
-    if (!s || !s.datetime) return '<div class="sat"><span aria-hidden="true">🛰️</span><span>Sem imagem de satélite recente e limpa sobre este ponto.</span></div>';
+    if (s && s.unavailable) return '<div class="sat"><span aria-hidden="true">🛰️</span><span>Não consegui consultar o catálogo de satélite agora. Tente de novo em instantes.</span></div>';
+    if (!s || !s.datetime) return '<div class="sat"><span aria-hidden="true">🛰️</span><span>Nenhuma imagem Sentinel-2 com pouca nuvem nos últimos 60 dias sobre este ponto.</span></div>';
     const d = new Date(s.datetime).toLocaleDateString('pt-BR');
     const img = s.thumbnail ? `<img src="${esc(s.thumbnail)}" alt="Miniatura da imagem Sentinel-2 de ${esc(d)}" loading="lazy" onerror="this.remove()">` : '<span aria-hidden="true">🛰️</span>';
     return `<div class="sat">${img}<span>Imagem de satélite mais recente: <b>${esc(d)}</b>${s.age_days != null ? ` (há ${s.age_days} dias)` : ''}${s.cloud_cover != null ? `, ${Math.round(s.cloud_cover)}% de nuvens` : ''}.</span></div>`;
@@ -456,6 +494,7 @@
       if (res.ok) { state.config = { ...state.config, ...(await res.json()) }; renderActs(); }
     } catch { /* usa padrão */ }
     restore();
+    try { const m = localStorage.getItem(STORE_KEY + ':layer'); if (m && m !== 'esri') setLayer(m); } catch { /* ok */ }
     if (state.lat == null) openPanel('local');
     if (state.activity) { const el = $('#act-' + state.activity); if (el) el.checked = true; }
     updateSteps();

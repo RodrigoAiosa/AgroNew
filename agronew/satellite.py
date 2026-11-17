@@ -14,8 +14,8 @@ import requests
 
 STAC_SEARCH_URL = "https://earth-search.aws.element84.com/v1/search"
 COLLECTION = "sentinel-2-l2a"
-MAX_CLOUD = 40
-LOOKBACK_DAYS = 30
+MAX_CLOUD = 60
+LOOKBACK_DAYS = 60
 TIMEOUT_S = 5
 
 
@@ -66,7 +66,7 @@ def latest_scene(lat: float, lon: float) -> dict[str, Any] | None:
         resp.raise_for_status()
         features = resp.json().get("features") or []
     except (requests.RequestException, ValueError):
-        return None
+        return {"unavailable": True}  # falha de rede/catálogo (diferente de "sem cena")
     if not features:
         return None
     return parse_feature(features[0], end)

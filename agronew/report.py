@@ -199,7 +199,9 @@ def build_pdf(*, result: dict[str, Any], wx: dict[str, Any], place: str | None,
 
     # Satélite
     story += [Paragraph("Imagem de satélite", st["h2"])]
-    if satellite and satellite.get("datetime"):
+    if satellite and satellite.get("unavailable"):
+        txt = "Não foi possível consultar o catálogo Sentinel-2 neste momento."
+    elif satellite and satellite.get("datetime"):
         cloud = satellite.get("cloud_cover")
         age = satellite.get("age_days")
         txt = (f"Cena Sentinel-2 mais recente com pouca nuvem sobre o ponto: "

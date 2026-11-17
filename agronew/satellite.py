@@ -42,7 +42,7 @@ def parse_feature(feature: dict[str, Any], now: datetime | None = None) -> dict[
 
 
 def latest_scene(lat: float, lon: float) -> dict[str, Any] | None:
-    if os.environ.get("AGROSHIELD_DEMO") == "1":
+    if os.environ.get("AGRONEW_DEMO") == "1":
         return {
             "id": "DEMO_SCENE",
             "datetime": "2026-11-13T13:41:00Z",

@@ -91,7 +91,7 @@ def normalize(raw: dict[str, Any]) -> dict[str, Any]:
 
 def fetch(lat: float, lon: float) -> dict[str, Any]:
     """Busca e normaliza a previsão (com cache de 10 min por ponto)."""
-    if os.environ.get("AGROSHIELD_DEMO") == "1":
+    if os.environ.get("AGRONEW_DEMO") == "1":
         return demo_weather(lat, lon)
 
     key = (round(lat, 2), round(lon, 2))
@@ -133,7 +133,7 @@ def geocode(name: str, count: int = 5) -> list[dict[str, Any]]:
     name = (name or "").strip()
     if len(name) < 2:
         return []
-    if os.environ.get("AGROSHIELD_DEMO") == "1":
+    if os.environ.get("AGRONEW_DEMO") == "1":
         return [{"name": name.title(), "admin1": "MT", "country": "Brasil",
                  "lat": -12.5453, "lon": -55.7211}]
     try:
@@ -163,7 +163,7 @@ def geocode(name: str, count: int = 5) -> list[dict[str, Any]]:
 
 def demo_weather(lat: float, lon: float, scenario: str | None = None) -> dict[str, Any]:
     """Dados sintéticos e determinísticos para testes e modo demonstração."""
-    scenario = scenario or os.environ.get("AGROSHIELD_DEMO_SCENARIO", "good")
+    scenario = scenario or os.environ.get("AGRONEW_DEMO_SCENARIO", "good")
     n = (PAST_DAYS + FORECAST_DAYS) * 24
     start = datetime(2026, 11, 15, 0, 0)
     times = [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in range(n)]

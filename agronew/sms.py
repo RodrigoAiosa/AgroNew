@@ -52,7 +52,7 @@ def build_sms(result: dict[str, Any], place: str | None = None) -> str:
     window = _window_text(result)
     loc = ascii_only(place)[:18] if place else ""
 
-    head = f"AgroShield {act}: {verdict}."
+    head = f"AgroNew {act}: {verdict}."
     options = [
         [head, reason + ".", window + "." if window else "", risk + ".", loc],
         [head, reason + ".", window + "." if window else "", risk + "."],
@@ -70,7 +70,7 @@ def build_sms(result: dict[str, Any], place: str | None = None) -> str:
 # Comandos recebidos
 # --------------------------------------------------------------------------
 HELP_TEXT = (
-    "AgroShield: envie OPERACAO + LOCAL. Ex: PULVERIZAR Sorriso MT "
+    "AgroNew: envie OPERACAO + LOCAL. Ex: PULVERIZAR Sorriso MT "
     "ou COLHER -12.54 -55.72. Operacoes: PLANTAR PULVERIZAR ADUBAR COLHER"
 )
 

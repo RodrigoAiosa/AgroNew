@@ -89,7 +89,7 @@ def build_pdf(*, result: dict[str, Any], wx: dict[str, Any], place: str | None,
     doc = SimpleDocTemplate(
         buf, pagesize=A4, leftMargin=16 * mm, rightMargin=16 * mm,
         topMargin=14 * mm, bottomMargin=16 * mm,
-        title=f"AgroShield – {result['activity_label']}", author="AgroShield",
+        title=f"AgroNew – {result['activity_label']}", author="AgroNew",
     )
     width = A4[0] - 32 * mm
     story: list = []
@@ -97,7 +97,7 @@ def build_pdf(*, result: dict[str, Any], wx: dict[str, Any], place: str | None,
     # Cabeçalho
     stamp = datetime.fromisoformat(result["now"]).strftime("%d/%m/%Y %H:%M")
     head = Table(
-        [[Paragraph("AgroShield", st["title"]),
+        [[Paragraph("AgroNew", st["title"]),
           Paragraph(f"Relatório de decisão<br/>Dados de {stamp} (hora local do talhão)", st["sub"])]],
         colWidths=[width * 0.4, width * 0.6],
     )
@@ -214,7 +214,7 @@ def build_pdf(*, result: dict[str, Any], wx: dict[str, Any], place: str | None,
     story += [Spacer(1, 10), Paragraph(
         "Fontes: Open-Meteo (previsão e solo, modelo numérico de ~10 km de resolução), "
         "Sentinel-2 / Copernicus via Earth Search (Element 84). "
-        "O AgroShield é um apoio à decisão: os valores são estimativas para o ponto central da área "
+        "O AgroNew é um apoio à decisão: os valores são estimativas para o ponto central da área "
         "e os limites são referências gerais. Confirme as condições no campo e siga a bula do produto "
         "e a orientação do seu engenheiro agrônomo.", st["small"])]
 
@@ -222,7 +222,7 @@ def build_pdf(*, result: dict[str, Any], wx: dict[str, Any], place: str | None,
         canvas.saveState()
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)
-        canvas.drawString(16 * mm, 9 * mm, "AgroShield · apoio à decisão no campo")
+        canvas.drawString(16 * mm, 9 * mm, "AgroNew · apoio à decisão no campo")
         canvas.drawRightString(A4[0] - 16 * mm, 9 * mm, f"Página {doc_.page}")
         canvas.restoreState()
 

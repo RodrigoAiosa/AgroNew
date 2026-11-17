@@ -1,5 +1,5 @@
 [project]
-name = "agroshield"
+name = "agronew"
 version = "1.0.0"
 description = "Decisão segura no campo: plantar, pulverizar, adubar ou colher."
 requires-python = ">=3.12"

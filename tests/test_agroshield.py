@@ -1,10 +1,10 @@
 import os
 
-os.environ["AGROSHIELD_DEMO"] = "1"
+os.environ["AGRONEW_DEMO"] = "1"
 
 import pytest
 
-from agroshield import geo, rules, satellite, sms, weather
+from agronew import geo, rules, satellite, sms, weather
 
 
 def wx(scenario):
@@ -50,7 +50,7 @@ def test_sms_is_ascii_and_fits_one_message():
         for act in rules.ACTIVITIES:
             text = sms.build_sms(rules.analyze(wx(sc), act), "Sorriso - MT com um nome bem longo")
             assert len(text) <= 160 and text.isascii()
-            assert text.startswith("AgroShield " + act.upper())
+            assert text.startswith("AgroNew " + act.upper())
 
 
 @pytest.mark.parametrize("body,expected", [
@@ -107,7 +107,7 @@ def test_api_pdf(client):
 
 def test_inbound_sms(client):
     r = client.post("/api/sms/inbound", data={"Body": "PLANTAR -12.5 -55.7"})
-    assert r.status_code == 200 and b"AgroShield PLANTAR" in r.data
+    assert r.status_code == 200 and b"AgroNew PLANTAR" in r.data
     assert b"PULVERIZAR" in client.get("/api/sms/inbound?Body=ajuda&format=text").data
 
 

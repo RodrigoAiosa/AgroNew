@@ -1,4 +1,4 @@
-# AgroShield
+# AgroNew
 
 **Posso plantar, pulverizar, adubar ou colher hoje?** Marque o talhão no mapa e receba um **SIM ou NÃO** claro, com o motivo em uma frase, a próxima janela boa, relatório em PDF e resposta por SMS.
 
@@ -7,7 +7,7 @@ Python (Flask) + front-end estático, pronto para a **Vercel**.
 ## O que ele faz
 
 - **Mapa de satélite em tela cheia** (Esri World Imagery) com **menu flutuante de vidro** (Local, Operação, Resposta, Ajuda): toque para marcar um ponto, desenhe a área do talhão, busque a cidade, digite coordenadas ou use o GPS. O selo SIM/NÃO fica visível sobre o mapa mesmo com o menu fechado.
-- **Decisão para 4 operações** (plantar, pulverizar, adubar, colher) com regras em `agroshield/rules.py`:
+- **Decisão para 4 operações** (plantar, pulverizar, adubar, colher) com regras em `agronew/rules.py`:
   vento, rajadas, chuva nas próximas horas, umidade e temperatura do solo, temperatura e umidade do ar.
 - **Resposta objetiva**: SIM/NÃO, motivo, risco (baixo/médio/alto), faixa de 48 h (verde/amarelo/vermelho) e próxima janela boa.
 - **Dados**: [Open-Meteo](https://open-meteo.com/en/docs) (clima + umidade/temperatura do solo) e **Sentinel-2** via [Earth Search](https://github.com/Element84/earth-search) (cena de satélite mais recente com pouca nuvem).
@@ -19,7 +19,7 @@ Python (Flask) + front-end estático, pronto para a **Vercel**.
 
 ```
 app.py                 API Flask (rotas /api/*) e servidor local
-agroshield/
+agronew/
   weather.py           Open-Meteo (clima/solo), geocodificação, cache
   satellite.py         Sentinel-2 (STAC Earth Search)
   rules.py             Motor de decisão e limites (LIMITS)
@@ -40,8 +40,8 @@ pytest                       # testes (usam dados sintéticos)
 python app.py                # http://localhost:3000
 ```
 
-Sem internet para as APIs? `AGROSHIELD_DEMO=1 python app.py` usa dados sintéticos
-(`AGROSHIELD_DEMO_SCENARIO=good|storm|windy|wet`). **Nunca ative em produção.**
+Sem internet para as APIs? `AGRONEW_DEMO=1 python app.py` usa dados sintéticos
+(`AGRONEW_DEMO_SCENARIO=good|storm|windy|wet`). **Nunca ative em produção.**
 
 ## Publicar na Vercel
 

@@ -1,11 +1,11 @@
-/* AgroShield — front-end (vanilla JS, sem build). */
+/* AgroNew — front-end (vanilla JS, sem build). */
 (() => {
   'use strict';
 
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const STORE_KEY = 'agroshield:v1';
+  const STORE_KEY = 'agronew:v1';
   const CACHE_TTL = 5 * 60 * 1000;
 
   const FALLBACK_ACTS = [
@@ -409,7 +409,7 @@
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `agroshield-${state.activity}.pdf`;
+      a.href = url; a.download = `agronew-${state.activity}.pdf`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
       btn.textContent = '✓ PDF pronto';

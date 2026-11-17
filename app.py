@@ -1,4 +1,4 @@
-"""AgroShield — API Flask (Vercel) + servidor local do front-end.
+"""AgroNew — API Flask (Vercel) + servidor local do front-end.
 
 Na Vercel, os arquivos de ``public/`` são servidos pela CDN e este módulo atende
 apenas ``/api/*``. Localmente (``python app.py``), ele também serve ``public/``.
@@ -15,8 +15,8 @@ from typing import Any
 from flask import Flask, Response, jsonify, request, send_from_directory
 from werkzeug.exceptions import HTTPException
 
-from agroshield import report, rules, satellite, sms, weather
-from agroshield.geo import valid_latlon
+from agronew import report, rules, satellite, sms, weather
+from agronew.geo import valid_latlon
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PUBLIC = os.path.join(ROOT, "public")
@@ -103,7 +103,7 @@ def _place_label(r: dict[str, Any]) -> str:
 # --------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
-    return {"ok": True, "demo": os.environ.get("AGROSHIELD_DEMO") == "1"}
+    return {"ok": True, "demo": os.environ.get("AGRONEW_DEMO") == "1"}
 
 
 @app.get("/api/config")
@@ -190,7 +190,7 @@ def report_pdf():
         result=data["result"], wx=data["wx"], place=place, lat=lat, lon=lon,
         area_ha=area_ha, satellite=data["sat"],
     )
-    fname = f"agroshield-{activity}-{data['result']['now'][:10]}.pdf"
+    fname = f"agronew-{activity}-{data['result']['now'][:10]}.pdf"
     return Response(pdf, mimetype="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="{fname}"',
         "Cache-Control": "no-store",
@@ -215,21 +215,21 @@ def _answer_sms(body_text: str) -> str:
     if cmd.get("help"):
         return sms.HELP_TEXT
     if cmd.get("error") == "operacao":
-        return "AgroShield: nao entendi. " + sms.HELP_TEXT
+        return "AgroNew: nao entendi. " + sms.HELP_TEXT
     if cmd.get("error") == "local":
-        return "AgroShield: faltou o local. Ex: " + cmd["activity"].upper() + " Sorriso MT"
+        return "AgroNew: faltou o local. Ex: " + cmd["activity"].upper() + " Sorriso MT"
     if "coords" in cmd:
         lat, lon = cmd["coords"]
         place = None
     else:
         found = weather.resolve_place(cmd["place"])
         if not found:
-            return "AgroShield: nao achei esse local. Envie CIDADE UF ou latitude e longitude."
+            return "AgroNew: nao achei esse local. Envie CIDADE UF ou latitude e longitude."
         lat, lon, place = found["lat"], found["lon"], _place_label(found)
     try:
         data = compute(lat, lon, cmd["activity"])
     except ApiError:
-        return "AgroShield: sem dados de clima agora. Tente de novo em alguns minutos."
+        return "AgroNew: sem dados de clima agora. Tente de novo em alguns minutos."
     return sms.build_sms(data["result"], place)
 
 

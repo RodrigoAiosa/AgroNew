@@ -1,4 +1,4 @@
-"""Motor de decisão do AgroShield.
+"""Motor de decisão do AgroNew.
 
 Transforma a previsão horária (clima + solo) em uma resposta objetiva —
 SIM ou NÃO — para quatro operações: plantar, pulverizar, adubar e colher.

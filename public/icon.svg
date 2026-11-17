@@ -1,6 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AgroShield">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AgroNew">
   <rect width="64" height="64" rx="14" fill="#166534"/>
-  <path d="M32 8 12 16v15c0 12 8.4 21.4 20 25 11.6-3.6 20-13 20-25V16L32 8Z" fill="#dcfce7"/>
-  <path d="M32 46V27" stroke="#166534" stroke-width="3.5" stroke-linecap="round"/>
-  <path d="M32 31c-7 0-10-4-10-9 7 0 10 4 10 9Zm0 4c7 0 10-4 10-9-7 0-10 4-10 9Z" fill="#16a34a"/>
+  <!-- corpo -->
+  <path d="M32 9c-9 0-16 6.5-16 16v13c0 8.5 7 15 16 15s16-6.5 16-15V25c0-9.500-7-16-16-16Z" fill="#a16207"/>
+  <!-- tufos das orelhas -->
+  <path d="M17 12l8 6-9 3Zm30 0-8 6 9 3Z" fill="#78350f"/>
+  <!-- peito -->
+  <path d="M32 31c-6 0-10 5-10 11 0 6 4.500 10 10 10s10-4 10-10c0-6-4-11-10-11Z" fill="#fde68a"/>
+  <path d="M27 40h2m3 0h0m3 0h2M28 46h2m4 0h2" stroke="#a16207" stroke-width="1.800" stroke-linecap="round"/>
+  <!-- olhos -->
+  <circle cx="24.500" cy="26" r="7.500" fill="#fffbeb"/>
+  <circle cx="39.500" cy="26" r="7.500" fill="#fffbeb"/>
+  <circle cx="24.500" cy="26.500" r="3.800" fill="#1f2937"/>
+  <circle cx="39.500" cy="26.500" r="3.800" fill="#1f2937"/>
+  <circle cx="25.800" cy="25" r="1.200" fill="#fff"/>
+  <circle cx="40.800" cy="25" r="1.200" fill="#fff"/>
+  <!-- bico -->
+  <path d="M32 30l-3 5h6Z" fill="#f59e0b"/>
+  <!-- asas e pés -->
+  <path d="M16 34c-2 7 0 13 5 16-1-6-1-11 0-15Zm32 0c2 7 0 13-5 16 1-6 1-11 0-15Z" fill="#854d0e"/>
+  <path d="M26 56l-1.500 3m3-3-.500 3m9-3 .500 3m3-3 1.500 3" stroke="#f59e0b" stroke-width="1.800" stroke-linecap="round"/>
 </svg>

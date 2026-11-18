@@ -283,10 +283,11 @@
     $('#dock-local').dataset.done = String(state.lat != null);
     $('#dock-act').dataset.done = String(!!state.activity);
     $('#dock-result').dataset.done = String(!!(state.data && state.activity));
+    updateAlertForm();
   }
 
   /* ------------------------------------------------------- menu flutuante */
-  const panels = { local: $('#panel-local'), act: $('#panel-act'), result: $('#panel-result') };
+  const panels = { local: $('#panel-local'), act: $('#panel-act'), result: $('#panel-result'), alerts: $('#panel-alerts') };
   let openId = null;
   function openPanel(id) {
     openId = id;
@@ -458,6 +459,142 @@
     }
   }
 
+  /* ---------------------------------------------------------------- alertas */
+  const ALERT_KEY = 'agronew:alerts';
+  const CHECK_EVERY = 30 * 60 * 1000;
+  const MAX_ALERTS = 10;
+  let alerts = [];
+  let lastRun = 0; let running = false; let unseen = 0;
+  const baseTitle = document.title;
+  try { alerts = JSON.parse(localStorage.getItem(ALERT_KEY)) || []; } catch { alerts = []; }
+  const saveAlerts = () => { try { localStorage.setItem(ALERT_KEY, JSON.stringify(alerts)); } catch { /* sem storage */ } };
+  const actLabel = (id) => (state.config.activities.find((a) => a.id === id) || { label: id, icon: '' });
+
+  let toastTimer = null;
+  function toast(msg, kind = '') {
+    const el = $('#toast');
+    el.className = 'toast glass ' + kind; el.textContent = msg; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 8000);
+  }
+  function setUnseen(n) {
+    unseen = n;
+    const dock = $('#dock-alerts');
+    if (n > 0) dock.dataset.badge = String(n); else delete dock.dataset.badge;
+    document.title = n > 0 ? `(${n}) ${baseTitle}` : baseTitle;
+  }
+
+  async function systemNotify(title, body, tag) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const opts = { body, tag, icon: 'icon.svg', badge: 'icon.svg', renotify: true };
+    try {
+      const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+      if (reg && reg.showNotification) await reg.showNotification(title, opts); else new Notification(title, opts);
+    } catch { /* o aviso na tela já foi mostrado */ }
+  }
+  function notify(title, body, tag, kind) {
+    toast(`${title} — ${body}`, kind);
+    systemNotify(title, body, tag);
+    setUnseen(unseen + 1);
+  }
+
+  function hourOf(iso) { return iso.slice(11, 13) + 'h'; }
+  function windowLine(r) {
+    if (r.go) return `Boa janela ${r.window_now_open_ended ? 'por mais de' : 'por cerca de'} ${r.window_now_hours} h.`;
+    return r.window ? `Próxima janela: ${r.window.label}` : 'Sem janela boa nas próximas 48 h.';
+  }
+
+  async function checkAlert(a) {
+    const res = await fetch(`/api/overview?lat=${a.lat.toFixed(5)}&lon=${a.lon.toFixed(5)}&name=${encodeURIComponent(a.name)}`);
+    if (!res.ok) throw new Error('falha');
+    const r = (await res.json()).activities[a.activity];
+    if (!r) return;
+    const verb = actLabel(a.activity).label.toLowerCase();
+    const first = a.lastGo === undefined || a.lastGo === null;
+    if (!first && !a.lastGo && r.go) notify(`✓ ${a.name}: pode ${verb} agora`, r.reason, `${a.id}-open`, '');
+    if (!first && a.lastGo && !r.go) notify(`✕ ${a.name}: janela de ${verb} fechou`, `${r.reason} ${windowLine(r)}`, `${a.id}-close`, 'bad');
+    if (r.go && !r.window_now_open_ended && r.window_now_hours <= 3) {
+      const end = r.timeline[r.window_now_hours];
+      if (end && a.warnKey !== end.time) {
+        a.warnKey = end.time;
+        notify(`⏳ ${a.name}: a janela fecha em cerca de ${r.window_now_hours} h`, `Termine de ${verb} antes das ${hourOf(end.time)}.`, `${a.id}-soon`, 'warn');
+      }
+    }
+    a.lastGo = r.go;
+    a.last = { t: Date.now(), go: r.go, line: windowLine(r), headline: r.headline };
+  }
+
+  async function runChecks(force = false) {
+    if (running || !alerts.length) return;
+    if (!force && Date.now() - lastRun < 10 * 60 * 1000) return;
+    running = true; lastRun = Date.now();
+    for (const a of alerts) {
+      try { await checkAlert(a); } catch { /* tenta de novo no próximo ciclo */ }
+    }
+    saveAlerts(); renderAlerts(); running = false;
+  }
+  setInterval(() => runChecks(true), CHECK_EVERY);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { runChecks(); if (openId === 'alerts') setUnseen(0); } });
+
+  function permState() { return 'Notification' in window ? Notification.permission : 'unsupported'; }
+  function renderPerm() {
+    const st = permState(); const box = $('#permBox');
+    if (st === 'unsupported') box.innerHTML = '<p class="bad">Este navegador não permite notificações.</p><p class="muted small">Os alertas continuam aparecendo na tela do AgroNew. No iPhone, instale o app na tela inicial (Compartilhar → Adicionar à Tela de Início).</p>';
+    else if (st === 'granted') box.innerHTML = '<p class="ok">✓ Avisos do navegador ativados.</p><button class="btn btn-glass btn-block" id="permTest" type="button">Enviar aviso de teste</button>';
+    else if (st === 'denied') box.innerHTML = '<p class="bad">Avisos bloqueados neste navegador.</p><p class="muted small">Clique no cadeado ao lado do endereço do site, libere <b>Notificações</b> e recarregue a página. Enquanto isso, os alertas aparecem só na tela do AgroNew.</p>';
+    else box.innerHTML = '<p>Para ser avisado mesmo com o AgroNew em segundo plano, ative as notificações.</p><button class="btn btn-primary btn-block" id="permAsk" type="button">Ativar avisos no navegador</button>';
+    const ask = $('#permAsk'); const test = $('#permTest');
+    if (ask) ask.addEventListener('click', async () => { try { await Notification.requestPermission(); } catch { /* ignora */ } renderPerm(); });
+    if (test) test.addEventListener('click', () => notify('🔔 AgroNew', 'Está tudo certo: você receberá os avisos aqui.', 'teste', ''));
+  }
+
+  function updateAlertForm() {
+    const ok = state.lat != null && !!state.activity;
+    $('#alertAdd').disabled = !ok || alerts.length >= MAX_ALERTS;
+    $('#alertHint').textContent = alerts.length >= MAX_ALERTS ? `Limite de ${MAX_ALERTS} alertas. Remova um para criar outro.`
+      : ok ? `Vai avisar quando a janela de ${actLabel(state.activity).label.toLowerCase()} abrir ou estiver para fechar.`
+        : 'Marque o talhão no mapa e escolha a operação para criar um alerta.';
+  }
+
+  function ago(t) {
+    const m = Math.round((Date.now() - t) / 60000);
+    return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : `há ${Math.round(m / 60)} h`;
+  }
+  function renderAlerts() {
+    renderPerm(); updateAlertForm();
+    const ul = $('#alertList');
+    if (!alerts.length) { ul.innerHTML = '<li class="muted">Nenhum alerta ainda.</li>'; return; }
+    ul.innerHTML = alerts.map((a) => {
+      const l = a.last; const al = actLabel(a.activity);
+      const cls = l ? (l.go ? 'go' : 'no') : '';
+      const chip = l ? `<span class="alert-chip ${l.go ? 'go' : 'no'}">${l.go ? '✓ Pode' : '✕ Não'}</span>` : '<span class="alert-chip na">Verificando…</span>';
+      return `<li class="${cls}"><div class="alert-top"><strong>${esc(a.name)}</strong>${chip}</div>
+        <div class="alert-meta">${al.icon} ${esc(al.label)}${l ? ` · ${esc(l.line)} · ${ago(l.t)}` : ''}</div>
+        <div class="alert-actions"><button class="btn btn-glass" data-view="${a.id}" type="button">Ver no mapa</button><button class="btn btn-glass" data-del="${a.id}" type="button">Remover</button></div></li>`;
+    }).join('');
+  }
+
+  $('#alertForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (state.lat == null || !state.activity || alerts.length >= MAX_ALERTS) return;
+    const name = ($('#alertName').value.trim() || state.name || `Talhão ${alerts.length + 1}`).slice(0, 40);
+    const a = { id: 'a' + Date.now().toString(36), name, activity: state.activity, lat: state.lat, lon: state.lon, areaHa: state.areaHa, polygon: state.polygon, lastGo: null };
+    alerts.push(a); saveAlerts(); $('#alertName').value = ''; renderAlerts();
+    toast(`Alerta criado: ${name} (${actLabel(a.activity).label.toLowerCase()})`);
+    if (permState() === 'default') $('#permBox').scrollIntoView({ block: 'nearest' });
+    runChecks(true);
+  });
+  $('#alertList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]'); const view = e.target.closest('[data-view]');
+    if (del) { alerts = alerts.filter((a) => a.id !== del.dataset.del); saveAlerts(); renderAlerts(); toast('Alerta removido.'); }
+    if (view) {
+      const a = alerts.find((x) => x.id === view.dataset.view); if (!a) return;
+      state.activity = a.activity; const r = $('#act-' + a.activity); if (r) r.checked = true;
+      if (a.polygon && a.polygon.length >= 3) setPolygon(a.polygon.map((p) => L.latLng(p[0], p[1])), a.name);
+      else setPoint(L.latLng(a.lat, a.lon), a.name, { fly: true, zoom: 15 });
+    }
+  });
+  $('#dock-alerts').addEventListener('click', () => { renderAlerts(); setUnseen(0); });
+
   /* ------------------------------------------------------------------ ajuda */
   $('#helpBtn').addEventListener('click', () => $('#helpDialog').showModal());
 
@@ -497,7 +634,8 @@
     try { const m = localStorage.getItem(STORE_KEY + ':layer'); if (m && m !== 'esri') setLayer(m); } catch { /* ok */ }
     if (state.lat == null) openPanel('local');
     if (state.activity) { const el = $('#act-' + state.activity); if (el) el.checked = true; }
-    updateSteps();
+    updateSteps(); renderAlerts();
+    if (alerts.length) setTimeout(() => runChecks(true), 3000);
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
   init();

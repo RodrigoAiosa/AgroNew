@@ -1,7 +1,7 @@
 /* Service worker mínimo: o app abre mesmo com sinal fraco.
    - Arquivos estáticos: cache primeiro (atualiza em segundo plano).
    - /api e tiles de mapa: sempre rede (o app já guarda a última resposta no aparelho). */
-const CACHE = 'agronew-shell-v4';
+const CACHE = 'agronew-shell-v5';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'icon.svg', 'manifest.webmanifest',
   'vendor/leaflet/leaflet.css', 'vendor/leaflet/leaflet.js',
@@ -17,6 +17,14 @@ self.addEventListener('activate', (e) => {
     caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+    for (const c of cs) { if ('focus' in c) return c.focus(); }
+    return self.clients.openWindow('./');
+  }));
 });
 
 self.addEventListener('fetch', (e) => {

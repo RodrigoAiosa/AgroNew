@@ -177,6 +177,28 @@ dialog::backdrop { background: rgb(0 0 0 / .45); -webkit-backdrop-filter: blur(4
 .help-list { padding-left: 1.2rem; margin: 0; } .help-list li { margin-bottom: .4rem; }
 .legend { list-style: none; margin: 0; padding: 0; }
 
+/* Alertas */
+.perm { padding: .7rem .8rem; border-radius: 14px; background: rgb(255 255 255 / .08); border: 1px solid var(--glass-line); margin-bottom: .75rem; }
+.perm p { margin: 0 0 .5rem; } .perm p:last-child { margin: 0; }
+.perm .ok { color: #86efac; font-weight: 700; } .perm .bad { color: #fecaca; font-weight: 700; }
+.alert-form { display: grid; gap: .5rem; margin-bottom: .5rem; }
+.alert-form input { min-height: var(--tap); padding: .6rem .9rem; border: 1.5px solid var(--glass-line); border-radius: 14px; background: rgb(255 255 255 / .1); color: var(--ink); font: inherit; }
+.alert-form input::placeholder { color: var(--muted); }
+.alert-list { list-style: none; margin: .75rem 0; padding: 0; display: grid; gap: .6rem; }
+.alert-list li { padding: .7rem .8rem; border-radius: 16px; border: 1.5px solid var(--glass-line); background: rgb(255 255 255 / .07); }
+.alert-list li.go { border-color: #4ade80; } .alert-list li.no { border-color: #f87171; }
+.alert-top { display: flex; justify-content: space-between; gap: .5rem; align-items: baseline; }
+.alert-top strong { overflow-wrap: anywhere; }
+.alert-chip { flex: none; font-size: .78rem; font-weight: 800; padding: .05rem .55rem; border-radius: 999px; }
+.alert-chip.go { background: #bbf7d0; color: #14532d; } .alert-chip.no { background: #fecaca; color: #7f1d1d; } .alert-chip.na { background: #e5e7eb; color: #374151; }
+.alert-meta { font-size: .85rem; color: var(--muted); margin: .2rem 0 .5rem; }
+.alert-actions { display: flex; gap: .4rem; }
+.alert-actions .btn { flex: 1; min-height: 44px; padding: .3rem .6rem; font-size: .9rem; }
+.toast { position: fixed; z-index: 900; top: calc(10px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(92vw, 400px); padding: .8rem 1rem; border-radius: 16px; font-weight: 650; border-left: 6px solid #4ade80; }
+.toast.warn { border-left-color: #fbbf24; } .toast.bad { border-left-color: #f87171; }
+.toast[hidden] { display: none; }
+.dock-btn[data-badge]::before { content: attr(data-badge); position: absolute; top: 2px; right: 20%; min-width: 18px; height: 18px; padding: 0 4px; display: grid; place-items: center; border-radius: 9px; background: #dc2626; color: #fff; font-size: .7rem; font-weight: 800; }
+
 @media (min-width: 960px) {
   .dock { width: 400px; }
   .sheet { max-height: 70vh; }

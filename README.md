@@ -12,6 +12,7 @@ Python (Flask) + front-end estático, pronto para a **Vercel**.
 - **Resposta objetiva**: SIM/NÃO, motivo, risco (baixo/médio/alto), faixa de 48 h (verde/amarelo/vermelho) e próxima janela boa.
 - **Dados**: [Open-Meteo](https://open-meteo.com/en/docs) (clima + umidade/temperatura do solo) e **Sentinel-2** via [Earth Search](https://github.com/Element84/earth-search) (cena de satélite mais recente com pouca nuvem).
 - **Camadas do mapa**: Esri (alta resolução, data variável), **Sentinel-2** (mosaico dos últimos 30 dias, até 30% de nuvem) e **NDVI**, via Copernicus Data Space (Sentinel Hub, WMS), mais mapa de ruas. Configure `SENTINEL_HUB_INSTANCE_ID` (o ID já vem preenchido por padrão).
+- **Alertas no navegador** (aba 🔔 do menu): salve o talhão com a operação e o AgroNew avisa quando a janela **abre**, **fecha** ou está **para fechar** (em até 3 h). Usa a API de notificações do navegador mais um aviso na tela. Tudo fica no aparelho (sem login nem banco), e a checagem roda a cada 30 min **enquanto o app estiver aberto** em alguma aba.
 - **PDF** limpo de 1 página (`POST /api/report.pdf`).
 - **SMS para quem está sem internet** (sem botão no app): o produtor manda `PULVERIZAR Sorriso MT` (ou `COLHER -12.54 -55.72`) para o número do projeto e recebe a decisão de volta em até 160 caracteres, sem acentos (webhook `/api/sms/inbound`, Twilio, opcional).
 - **Funciona com sinal fraco**: service worker guarda o app; a última resposta fica salva no aparelho.
@@ -69,6 +70,12 @@ Sem internet para as APIs? `AGRONEW_DEMO=1 python app.py` usa dados sintéticos
 | **Pico-fim** | A jornada termina com a ação útil: baixar o PDF |
 | **Estética-usabilidade** | Visual limpo, alto contraste (≥ 4,5:1), tipografia legível ao sol |
 | **Acessibilidade** | Rótulos, `aria-live`, foco visível, `prefers-reduced-motion`, não depende só de cor |
+
+## Limites dos alertas
+
+- Funcionam só com o AgroNew **aberto** em alguma aba (pode estar minimizada). Fechando o navegador, não há aviso.
+- No iPhone, as notificações exigem instalar o app na tela inicial (Safari 16.4+).
+- Próximo passo para avisar com o navegador fechado: Web Push com servidor, banco para guardar os talhões e uma tarefa agendada (Vercel Cron) que verifica o tempo.
 
 ## Limites e honestidade dos dados
 

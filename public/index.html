@@ -70,13 +70,29 @@
       <header class="sheet-head"><h2 id="t-result">Resposta</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
       <div id="resultBody" aria-live="polite"></div>
     </section>
+
+    <section class="glass sheet" id="panel-alerts" aria-labelledby="t-alerts" inert>
+      <header class="sheet-head"><h2 id="t-alerts">Alertas no navegador</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
+      <div class="perm" id="permBox"></div>
+      <form class="alert-form" id="alertForm">
+        <label class="sr-only" for="alertName">Nome do talhão</label>
+        <input id="alertName" type="text" maxlength="40" placeholder="Nome do talhão (ex.: Talhão 4)" autocomplete="off">
+        <button class="btn btn-primary btn-block" id="alertAdd" type="submit"><span aria-hidden="true">🔔</span> Criar alerta para este talhão</button>
+        <p class="muted small" id="alertHint"></p>
+      </form>
+      <ul class="alert-list" id="alertList"></ul>
+      <p class="muted small">Os avisos chegam enquanto o AgroNew estiver aberto no navegador (pode ser em outra aba ou minimizado). A checagem é feita a cada 30 minutos.</p>
+    </section>
   </div>
+
+  <div class="toast glass" id="toast" role="status" aria-live="polite" hidden></div>
 
   <!-- Menu flutuante -->
   <nav class="dock glass" aria-label="Menu">
     <button type="button" class="dock-btn" data-panel="local" aria-controls="panel-local" aria-expanded="false" id="dock-local"><span class="di" aria-hidden="true">📍</span><span>Local</span></button>
     <button type="button" class="dock-btn" data-panel="act" aria-controls="panel-act" aria-expanded="false" id="dock-act"><span class="di" aria-hidden="true">🌱</span><span>Operação</span></button>
     <button type="button" class="dock-btn" data-panel="result" aria-controls="panel-result" aria-expanded="false" id="dock-result"><span class="di" aria-hidden="true">✅</span><span>Resposta</span></button>
+    <button type="button" class="dock-btn" data-panel="alerts" aria-controls="panel-alerts" aria-expanded="false" id="dock-alerts"><span class="di" aria-hidden="true">🔔</span><span>Alertas</span></button>
     <button type="button" class="dock-btn" id="helpBtn"><span class="di" aria-hidden="true">❔</span><span>Ajuda</span></button>
   </nav>
 

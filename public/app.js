@@ -200,13 +200,20 @@
     q.value = placeLabel(r);
     setPoint(L.latLng(r.lat, r.lon), placeLabel(r), { fly: true, zoom: 13 });
   }
+  let geoSeq = 0; let geoCtl = null;
+  // Só a busca mais recente vale: respostas antigas (texto incompleto) são descartadas.
   async function fetchPlaces(text) {
-    const res = await fetch('/api/geocode?q=' + encodeURIComponent(text));
+    const seq = ++geoSeq;
+    if (geoCtl) { try { geoCtl.abort(); } catch { /* ok */ } }
+    geoCtl = new AbortController();
+    const res = await fetch('/api/geocode?q=' + encodeURIComponent(text), { signal: geoCtl.signal });
     if (!res.ok) throw new Error('geocode');
-    return (await res.json()).results || [];
+    const results = (await res.json()).results || [];
+    if (seq !== geoSeq) throw new DOMException('obsoleta', 'AbortError');
+    return results;
   }
   q.addEventListener('input', () => {
-    clearTimeout(sugTimer);
+    clearTimeout(sugTimer); geoSeq++; // invalida buscas em andamento
     const v = q.value.trim();
     if (v.length < 3) return hideSug();
     sugTimer = setTimeout(async () => {
@@ -215,7 +222,7 @@
         if (!sugResults.length) return hideSug();
         sug.innerHTML = sugResults.map((r, i) => `<li role="option"><button type="button" data-i="${i}">${esc(r.name)}<small>${esc([r.admin1, isBR(r) ? '' : r.country].filter(Boolean).join(' · '))}</small></button></li>`).join('');
         sug.hidden = false; q.setAttribute('aria-expanded', 'true');
-      } catch { hideSug(); }
+      } catch (err) { if (!(err && err.name === 'AbortError')) hideSug(); }
     }, 300);
   });
   sug.addEventListener('click', (e) => {
@@ -235,10 +242,11 @@
       if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) { hideSug(); return setPoint(L.latLng(lat, lon), '', { fly: true, zoom: 15 }); }
     }
     try {
-      const results = sugResults.length && !sug.hidden ? sugResults : await fetchPlaces(v);
+      clearTimeout(sugTimer); // sempre busca o texto completo, nunca uma lista antiga
+      const results = await fetchPlaces(v);
       if (!results.length) return summary('Não encontrei esse lugar. Tente "Cidade UF" ou toque no mapa.');
       pickPlace(results[0]);
-    } catch { summary('Sem conexão para buscar. Toque no mapa para marcar o talhão.'); }
+    } catch (err) { if (!(err && err.name === 'AbortError')) summary('Sem conexão para buscar. Toque no mapa para marcar o talhão.'); }
   });
 
   $('#locateBtn').addEventListener('click', () => {

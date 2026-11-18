@@ -83,3 +83,11 @@ Sem internet para as APIs? `AGRONEW_DEMO=1 python app.py` usa dados sintéticos
 - O satélite entra como **imagem de fundo** e como **a cena Sentinel-2 mais recente com pouca nuvem**. O NDVI aparece só como **camada visual** no mapa; o app **ainda não calcula um valor de NDVI** do talhão (próximo passo natural: ler as bandas B04/B08 do COG por requisição de faixa).
 - Os limites em `rules.LIMITS` são referências gerais de campo (por exemplo, pulverizar com vento de 3 a 10 km/h, abaixo de ~30 °C e umidade do ar acima de ~55%). Ajuste por cultura, solo e produto; bula e agrônomo têm a palavra final.
 - Uso comercial do Open-Meteo exige chave (`OPEN_METEO_API_KEY`). Os mapas Esri e OpenStreetMap exigem atribuição (já exibida) e têm termos de uso próprios.
+
+
+## Menu central e talhões salvos
+
+- Todas as funções ficam no menu de vidro: **Local** (busca, GPS, ponto ou desenhar área), **Mapa** (Esri, Sentinel-2, NDVI, ruas), **Operação**, **Resposta** e **Talhões**.
+- **Talhões** guarda suas marcações (ponto ou área) no próprio aparelho (localStorage, sem login). Cada talhão tem: Ver no mapa, Renomear, Remover e um sino por operação para avisos de janela.
+- Os alertas antigos (`agronew:alerts`) são migrados automaticamente para talhões.
+- Limites: até 30 talhões; os dados ficam só neste navegador (limpar dados do site apaga); avisos só chegam com o AgroNew aberto (checagem a cada 30 min).

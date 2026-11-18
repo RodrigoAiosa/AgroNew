@@ -47,12 +47,7 @@
     });
   }
   let overlay = null;
-  const LAYER_NOTES = {
-    esri: '',
-    s2: 'Sentinel-2: mosaico das imagens mais recentes dos últimos 30 dias (até 30% de nuvem). Pode misturar datas; onde não há imagem limpa, aparece a Esri.',
-    ndvi: 'NDVI: índice de vigor da vegetação (Sentinel-2, últimos 30 dias). Só faz sentido sobre áreas com plantas.',
-    streets: '',
-  };
+
   const fieldLayer = L.featureGroup().addTo(map);
   Object.assign(L.drawLocal.draw.handlers.polygon.tooltip, {
     start: 'Toque para marcar o primeiro canto.',
@@ -73,12 +68,10 @@
         if (overlay) overlay.addTo(map);
       }
     }
-    document.querySelectorAll('#layerSwitch .chip').forEach((b) => {
+    document.querySelectorAll('#layerSwitch .layer-opt').forEach((b) => {
       const on = b.dataset.layer === mode;
       b.classList.toggle('is-active', on); b.setAttribute('aria-checked', String(on));
     });
-    const note = $('#layerNote');
-    note.textContent = LAYER_NOTES[mode] || ''; note.hidden = !LAYER_NOTES[mode];
     try { localStorage.setItem(STORE_KEY + ':layer', mode); } catch { /* sem storage */ }
   }
   $('#layerSwitch').addEventListener('click', (e) => {
@@ -283,11 +276,11 @@
     $('#dock-local').dataset.done = String(state.lat != null);
     $('#dock-act').dataset.done = String(!!state.activity);
     $('#dock-result').dataset.done = String(!!(state.data && state.activity));
-    updateAlertForm();
+    updateFieldForm();
   }
 
   /* ------------------------------------------------------- menu flutuante */
-  const panels = { local: $('#panel-local'), act: $('#panel-act'), result: $('#panel-result'), alerts: $('#panel-alerts') };
+  const panels = { local: $('#panel-local'), map: $('#panel-map'), act: $('#panel-act'), result: $('#panel-result'), fields: $('#panel-fields') };
   let openId = null;
   function openPanel(id) {
     openId = id;
@@ -429,8 +422,10 @@
       ${satHtml(state.data.satellite)}
       <div class="actions">
         <button class="btn btn-primary btn-block" id="pdfBtn" type="button"><span aria-hidden="true">📄</span> Baixar relatório (PDF)</button>
+        <button class="btn btn-glass btn-block" id="saveFieldBtn" type="button"><span aria-hidden="true">💾</span> Salvar este talhão</button>
       </div>`;
     $('#pdfBtn').addEventListener('click', (e) => downloadPdf(e.currentTarget));
+    $('#saveFieldBtn').addEventListener('click', () => saveCurrentField());
     updatePill(r);
     updateSteps();
   }
@@ -459,15 +454,30 @@
     }
   }
 
-  /* ---------------------------------------------------------------- alertas */
-  const ALERT_KEY = 'agronew:alerts';
+  /* ------------------------------------------------- talhões salvos e alertas */
+  const FIELDS_KEY = 'agronew:fields';
+  const OLD_ALERTS_KEY = 'agronew:alerts';
   const CHECK_EVERY = 30 * 60 * 1000;
-  const MAX_ALERTS = 10;
-  let alerts = [];
+  const MAX_FIELDS = 30;
+  let fields = [];
   let lastRun = 0; let running = false; let unseen = 0;
   const baseTitle = document.title;
-  try { alerts = JSON.parse(localStorage.getItem(ALERT_KEY)) || []; } catch { alerts = []; }
-  const saveAlerts = () => { try { localStorage.setItem(ALERT_KEY, JSON.stringify(alerts)); } catch { /* sem storage */ } };
+
+  function loadFields() {
+    try { const v = JSON.parse(localStorage.getItem(FIELDS_KEY)); if (Array.isArray(v)) return v; } catch { /* segue */ }
+    try { // migra os alertas da versão anterior (um por operação) para talhões
+      const old = JSON.parse(localStorage.getItem(OLD_ALERTS_KEY)) || []; const out = [];
+      for (const a of old) {
+        let f = out.find((x) => x.name === a.name && Math.abs(x.lat - a.lat) < 1e-4 && Math.abs(x.lon - a.lon) < 1e-4);
+        if (!f) { f = { id: 'f' + a.id, name: a.name, lat: a.lat, lon: a.lon, areaHa: a.areaHa || null, polygon: a.polygon || null, acts: [], st: {} }; out.push(f); }
+        if (!f.acts.includes(a.activity)) f.acts.push(a.activity);
+        f.st[a.activity] = { lastGo: a.lastGo ?? null, warnKey: a.warnKey || null, last: a.last || null };
+      }
+      return out;
+    } catch { return []; }
+  }
+  fields = loadFields();
+  const saveFields = () => { try { localStorage.setItem(FIELDS_KEY, JSON.stringify(fields)); } catch { /* sem storage */ } };
   const actLabel = (id) => (state.config.activities.find((a) => a.id === id) || { label: id, icon: '' });
 
   let toastTimer = null;
@@ -478,11 +488,10 @@
   }
   function setUnseen(n) {
     unseen = n;
-    const dock = $('#dock-alerts');
+    const dock = $('#dock-fields');
     if (n > 0) dock.dataset.badge = String(n); else delete dock.dataset.badge;
     document.title = n > 0 ? `(${n}) ${baseTitle}` : baseTitle;
   }
-
   async function systemNotify(title, body, tag) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const opts = { body, tag, icon: 'icon.svg', badge: 'icon.svg', renotify: true };
@@ -497,103 +506,120 @@
     setUnseen(unseen + 1);
   }
 
-  function hourOf(iso) { return iso.slice(11, 13) + 'h'; }
+  const hourOf = (iso) => iso.slice(11, 13) + 'h';
   function windowLine(r) {
     if (r.go) return `Boa janela ${r.window_now_open_ended ? 'por mais de' : 'por cerca de'} ${r.window_now_hours} h.`;
     return r.window ? `Próxima janela: ${r.window.label}` : 'Sem janela boa nas próximas 48 h.';
   }
 
-  async function checkAlert(a) {
-    const res = await fetch(`/api/overview?lat=${a.lat.toFixed(5)}&lon=${a.lon.toFixed(5)}&name=${encodeURIComponent(a.name)}`);
-    if (!res.ok) throw new Error('falha');
-    const r = (await res.json()).activities[a.activity];
-    if (!r) return;
-    const verb = actLabel(a.activity).label.toLowerCase();
-    const first = a.lastGo === undefined || a.lastGo === null;
-    if (!first && !a.lastGo && r.go) notify(`✓ ${a.name}: pode ${verb} agora`, r.reason, `${a.id}-open`, '');
-    if (!first && a.lastGo && !r.go) notify(`✕ ${a.name}: janela de ${verb} fechou`, `${r.reason} ${windowLine(r)}`, `${a.id}-close`, 'bad');
+  function checkAct(f, act, r) {
+    const s = f.st[act] || (f.st[act] = { lastGo: null, warnKey: null, last: null });
+    const verb = actLabel(act).label.toLowerCase();
+    const first = s.lastGo === null || s.lastGo === undefined;
+    if (!first && !s.lastGo && r.go) notify(`✓ ${f.name}: pode ${verb} agora`, r.reason, `${f.id}-${act}-open`, '');
+    if (!first && s.lastGo && !r.go) notify(`✕ ${f.name}: janela de ${verb} fechou`, `${r.reason} ${windowLine(r)}`, `${f.id}-${act}-close`, 'bad');
     if (r.go && !r.window_now_open_ended && r.window_now_hours <= 3) {
       const end = r.timeline[r.window_now_hours];
-      if (end && a.warnKey !== end.time) {
-        a.warnKey = end.time;
-        notify(`⏳ ${a.name}: a janela fecha em cerca de ${r.window_now_hours} h`, `Termine de ${verb} antes das ${hourOf(end.time)}.`, `${a.id}-soon`, 'warn');
+      if (end && s.warnKey !== end.time) {
+        s.warnKey = end.time;
+        notify(`⏳ ${f.name}: a janela fecha em cerca de ${r.window_now_hours} h`, `Termine de ${verb} antes das ${hourOf(end.time)}.`, `${f.id}-${act}-soon`, 'warn');
       }
     }
-    a.lastGo = r.go;
-    a.last = { t: Date.now(), go: r.go, line: windowLine(r), headline: r.headline };
+    s.lastGo = r.go;
+    s.last = { t: Date.now(), go: r.go, line: windowLine(r) };
   }
 
+  async function checkField(f) {
+    if (!f.acts.length) return;
+    const res = await fetch(`/api/overview?lat=${f.lat.toFixed(5)}&lon=${f.lon.toFixed(5)}&name=${encodeURIComponent(f.name)}`);
+    if (!res.ok) throw new Error('falha');
+    const data = (await res.json()).activities;
+    for (const act of f.acts) if (data[act]) checkAct(f, act, data[act]);
+  }
   async function runChecks(force = false) {
-    if (running || !alerts.length) return;
+    if (running || !fields.some((f) => f.acts.length)) return;
     if (!force && Date.now() - lastRun < 10 * 60 * 1000) return;
     running = true; lastRun = Date.now();
-    for (const a of alerts) {
-      try { await checkAlert(a); } catch { /* tenta de novo no próximo ciclo */ }
-    }
-    saveAlerts(); renderAlerts(); running = false;
+    for (const f of fields) { try { await checkField(f); } catch { /* tenta no próximo ciclo */ } }
+    saveFields(); renderFields(); running = false;
   }
   setInterval(() => runChecks(true), CHECK_EVERY);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { runChecks(); if (openId === 'alerts') setUnseen(0); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { runChecks(); if (openId === 'fields') setUnseen(0); } });
 
   function permState() { return 'Notification' in window ? Notification.permission : 'unsupported'; }
   function renderPerm() {
     const st = permState(); const box = $('#permBox');
-    if (st === 'unsupported') box.innerHTML = '<p class="bad">Este navegador não permite notificações.</p><p class="muted small">Os alertas continuam aparecendo na tela do AgroNew. No iPhone, instale o app na tela inicial (Compartilhar → Adicionar à Tela de Início).</p>';
+    if (st === 'unsupported') box.innerHTML = '<p class="bad">Este navegador não permite notificações.</p><p class="muted small">Os avisos continuam aparecendo na tela do AgroNew. No iPhone, instale o app na tela inicial (Compartilhar → Adicionar à Tela de Início).</p>';
     else if (st === 'granted') box.innerHTML = '<p class="ok">✓ Avisos do navegador ativados.</p><button class="btn btn-glass btn-block" id="permTest" type="button">Enviar aviso de teste</button>';
-    else if (st === 'denied') box.innerHTML = '<p class="bad">Avisos bloqueados neste navegador.</p><p class="muted small">Clique no cadeado ao lado do endereço do site, libere <b>Notificações</b> e recarregue a página. Enquanto isso, os alertas aparecem só na tela do AgroNew.</p>';
-    else box.innerHTML = '<p>Para ser avisado mesmo com o AgroNew em segundo plano, ative as notificações.</p><button class="btn btn-primary btn-block" id="permAsk" type="button">Ativar avisos no navegador</button>';
+    else if (st === 'denied') box.innerHTML = '<p class="bad">Avisos bloqueados neste navegador.</p><p class="muted small">Clique no cadeado ao lado do endereço do site, libere <b>Notificações</b> e recarregue. Enquanto isso, os avisos aparecem só na tela do AgroNew.</p>';
+    else box.innerHTML = '<p>Para ser avisado com o AgroNew em segundo plano, ative as notificações.</p><button class="btn btn-primary btn-block" id="permAsk" type="button">Ativar avisos no navegador</button>';
     const ask = $('#permAsk'); const test = $('#permTest');
     if (ask) ask.addEventListener('click', async () => { try { await Notification.requestPermission(); } catch { /* ignora */ } renderPerm(); });
     if (test) test.addEventListener('click', () => notify('🔔 AgroNew', 'Está tudo certo: você receberá os avisos aqui.', 'teste', ''));
   }
 
-  function updateAlertForm() {
-    const ok = state.lat != null && !!state.activity;
-    $('#alertAdd').disabled = !ok || alerts.length >= MAX_ALERTS;
-    $('#alertHint').textContent = alerts.length >= MAX_ALERTS ? `Limite de ${MAX_ALERTS} alertas. Remova um para criar outro.`
-      : ok ? `Vai avisar quando a janela de ${actLabel(state.activity).label.toLowerCase()} abrir ou estiver para fechar.`
-        : 'Marque o talhão no mapa e escolha a operação para criar um alerta.';
+  function updateFieldForm() {
+    const ok = state.lat != null;
+    $('#fieldAdd').disabled = !ok || fields.length >= MAX_FIELDS;
+    $('#fieldHint').textContent = fields.length >= MAX_FIELDS ? `Limite de ${MAX_FIELDS} talhões. Remova um para salvar outro.`
+      : ok ? 'Salva o ponto ou a área que está marcada no mapa agora.' : 'Marque o talhão no mapa para poder salvar.';
   }
 
-  function ago(t) {
-    const m = Math.round((Date.now() - t) / 60000);
-    return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : `há ${Math.round(m / 60)} h`;
-  }
-  function renderAlerts() {
-    renderPerm(); updateAlertForm();
-    const ul = $('#alertList');
-    if (!alerts.length) { ul.innerHTML = '<li class="muted">Nenhum alerta ainda.</li>'; return; }
-    ul.innerHTML = alerts.map((a) => {
-      const l = a.last; const al = actLabel(a.activity);
-      const cls = l ? (l.go ? 'go' : 'no') : '';
-      const chip = l ? `<span class="alert-chip ${l.go ? 'go' : 'no'}">${l.go ? '✓ Pode' : '✕ Não'}</span>` : '<span class="alert-chip na">Verificando…</span>';
-      return `<li class="${cls}"><div class="alert-top"><strong>${esc(a.name)}</strong>${chip}</div>
-        <div class="alert-meta">${al.icon} ${esc(al.label)}${l ? ` · ${esc(l.line)} · ${ago(l.t)}` : ''}</div>
-        <div class="alert-actions"><button class="btn btn-glass" data-view="${a.id}" type="button">Ver no mapa</button><button class="btn btn-glass" data-del="${a.id}" type="button">Remover</button></div></li>`;
+  const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : `há ${Math.round(m / 60)} h`; };
+  function renderFields() {
+    renderPerm(); updateFieldForm();
+    const ul = $('#fieldList');
+    if (!fields.length) { ul.innerHTML = '<li class="muted">Nenhum talhão salvo ainda. Marque no mapa e toque em “Salvar marcação atual”.</li>'; return; }
+    ul.innerHTML = fields.map((f) => {
+      const kind = f.polygon ? `Área ${f.areaHa ? fmtHa(f.areaHa) : ''}`.trim() : 'Ponto';
+      const newest = Math.max(0, ...f.acts.map((a) => (f.st[a] && f.st[a].last ? f.st[a].last.t : 0)));
+      const chips = state.config.activities.map((a) => {
+        const on = f.acts.includes(a.id); const l = on && f.st[a.id] && f.st[a.id].last;
+        return `<button type="button" class="act-chip ${on ? 'on' : ''} ${l ? (l.go ? 'go' : 'no') : ''}" data-tog="${f.id}:${a.id}" aria-pressed="${on}" title="${on ? 'Desligar' : 'Ligar'} aviso de ${esc(a.label.toLowerCase())}">${on ? '🔔' : '🔕'} ${esc(a.label)}${l ? (l.go ? ' ✓' : ' ✕') : ''}</button>`;
+      }).join('');
+      return `<li><div class="field-top"><strong>${esc(f.name)}</strong><span class="field-kind">${esc(kind)}</span></div>
+        <div class="field-meta">${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}${newest ? ` · checado ${ago(newest)}` : ''}</div>
+        <p class="field-acts-label">Avisar quando a janela abrir ou fechar:</p>
+        <div class="act-chips">${chips}</div>
+        <div class="field-actions"><button class="btn btn-primary" data-view="${f.id}" type="button">Ver no mapa</button><button class="btn btn-glass" data-ren="${f.id}" type="button">Renomear</button><button class="btn btn-glass" data-del="${f.id}" type="button">Remover</button></div></li>`;
     }).join('');
   }
 
-  $('#alertForm').addEventListener('submit', (e) => {
+  function saveCurrentField(name) {
+    if (state.lat == null) return null;
+    if (fields.length >= MAX_FIELDS) { toast(`Limite de ${MAX_FIELDS} talhões.`, 'warn'); return null; }
+    const dup = fields.find((f) => Math.abs(f.lat - state.lat) < 1e-5 && Math.abs(f.lon - state.lon) < 1e-5);
+    if (dup) { toast(`Esta marcação já está salva como “${dup.name}”.`, 'warn'); return dup; }
+    const f = { id: 'f' + Date.now().toString(36), name: (name || state.name || `Talhão ${fields.length + 1}`).slice(0, 40), lat: state.lat, lon: state.lon, areaHa: state.areaHa, polygon: state.polygon, acts: [], st: {} };
+    fields.push(f); saveFields(); renderFields(); toast(`Talhão salvo: ${f.name}`);
+    return f;
+  }
+  $('#fieldForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    if (state.lat == null || !state.activity || alerts.length >= MAX_ALERTS) return;
-    const name = ($('#alertName').value.trim() || state.name || `Talhão ${alerts.length + 1}`).slice(0, 40);
-    const a = { id: 'a' + Date.now().toString(36), name, activity: state.activity, lat: state.lat, lon: state.lon, areaHa: state.areaHa, polygon: state.polygon, lastGo: null };
-    alerts.push(a); saveAlerts(); $('#alertName').value = ''; renderAlerts();
-    toast(`Alerta criado: ${name} (${actLabel(a.activity).label.toLowerCase()})`);
-    if (permState() === 'default') $('#permBox').scrollIntoView({ block: 'nearest' });
-    runChecks(true);
+    const f = saveCurrentField($('#fieldName').value.trim());
+    if (f) $('#fieldName').value = '';
   });
-  $('#alertList').addEventListener('click', (e) => {
-    const del = e.target.closest('[data-del]'); const view = e.target.closest('[data-view]');
-    if (del) { alerts = alerts.filter((a) => a.id !== del.dataset.del); saveAlerts(); renderAlerts(); toast('Alerta removido.'); }
-    if (view) {
-      const a = alerts.find((x) => x.id === view.dataset.view); if (!a) return;
-      state.activity = a.activity; const r = $('#act-' + a.activity); if (r) r.checked = true;
-      if (a.polygon && a.polygon.length >= 3) setPolygon(a.polygon.map((p) => L.latLng(p[0], p[1])), a.name);
-      else setPoint(L.latLng(a.lat, a.lon), a.name, { fly: true, zoom: 15 });
+  $('#fieldList').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-tog],[data-view],[data-ren],[data-del]'); if (!t) return;
+    if (t.dataset.tog) {
+      const [id, act] = t.dataset.tog.split(':'); const f = fields.find((x) => x.id === id); if (!f) return;
+      const i = f.acts.indexOf(act);
+      if (i >= 0) { f.acts.splice(i, 1); delete f.st[act]; } else { f.acts.push(act); f.st[act] = { lastGo: null, warnKey: null, last: null }; }
+      saveFields(); renderFields();
+      if (i < 0) { toast(`Aviso ligado: ${f.name} · ${actLabel(act).label.toLowerCase()}`); runChecks(true); }
+      return;
+    }
+    const f = fields.find((x) => x.id === (t.dataset.view || t.dataset.ren || t.dataset.del)); if (!f) return;
+    if (t.dataset.del) { fields = fields.filter((x) => x.id !== f.id); saveFields(); renderFields(); toast(`Talhão removido: ${f.name}`); }
+    else if (t.dataset.ren) {
+      const n = (window.prompt('Novo nome do talhão:', f.name) || '').trim().slice(0, 40);
+      if (n) { f.name = n; saveFields(); renderFields(); }
+    } else {
+      if (f.polygon && f.polygon.length >= 3) setPolygon(f.polygon.map((p) => L.latLng(p[0], p[1])), f.name);
+      else setPoint(L.latLng(f.lat, f.lon), f.name, { fly: true, zoom: 15 });
     }
   });
-  $('#dock-alerts').addEventListener('click', () => { renderAlerts(); setUnseen(0); });
+  $('#dock-fields').addEventListener('click', () => { renderFields(); setUnseen(0); });
 
   /* ------------------------------------------------------------------ ajuda */
   $('#helpBtn').addEventListener('click', () => $('#helpDialog').showModal());
@@ -634,8 +660,8 @@
     try { const m = localStorage.getItem(STORE_KEY + ':layer'); if (m && m !== 'esri') setLayer(m); } catch { /* ok */ }
     if (state.lat == null) openPanel('local');
     if (state.activity) { const el = $('#act-' + state.activity); if (el) el.checked = true; }
-    updateSteps(); renderAlerts();
-    if (alerts.length) setTimeout(() => runChecks(true), 3000);
+    updateSteps(); renderFields();
+    if (fields.some((f) => f.acts.length)) setTimeout(() => runChecks(true), 3000);
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   }
   init();

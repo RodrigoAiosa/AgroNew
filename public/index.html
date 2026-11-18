@@ -21,22 +21,10 @@
     <strong>AgroNew</strong>
   </div>
 
-  <div class="map-modes glass" role="group" aria-label="Como marcar no mapa">
-    <button type="button" class="chip is-active" id="modePoint" aria-pressed="true"><span aria-hidden="true">📌</span> Ponto</button>
-    <button type="button" class="chip" id="modeDraw" aria-pressed="false"><span aria-hidden="true">✏️</span> Desenhar área</button>
-  </div>
-
-  <div class="glass layer-switch" id="layerSwitch" role="radiogroup" aria-label="Camada do mapa">
-    <button type="button" class="chip is-active" role="radio" aria-checked="true" data-layer="esri" title="Imagem de alta resolução, data varia (meses ou anos)">Esri</button>
-    <button type="button" class="chip" role="radio" aria-checked="false" data-layer="s2" title="Sentinel-2: mosaico das imagens mais recentes (30 dias, até 30% de nuvem)">Sentinel-2</button>
-    <button type="button" class="chip" role="radio" aria-checked="false" data-layer="ndvi" title="NDVI: vigor da vegetação (Sentinel-2)">NDVI</button>
-    <button type="button" class="chip" role="radio" aria-checked="false" data-layer="streets">Ruas</button>
-  </div>
-  <p class="layer-note glass" id="layerNote" hidden></p>
-
   <!-- Resposta sempre à vista, mesmo com o menu fechado -->
   <button type="button" class="verdict-pill" id="verdictPill" hidden></button>
 
+  <!-- Barra de desenho: só aparece enquanto você desenha a área -->
   <div class="draw-bar glass" id="drawBar" hidden>
     <p id="drawHint">Toque nos cantos do talhão. Mínimo de 3 pontos.</p>
     <div class="draw-actions">
@@ -46,7 +34,7 @@
     </div>
   </div>
 
-  <!-- Painéis de vidro (um aberto por vez) -->
+  <!-- Painéis de vidro do menu central (um aberto por vez) -->
   <div class="sheets">
     <section class="glass sheet" id="panel-local" aria-labelledby="t-local" inert>
       <header class="sheet-head"><h2 id="t-local">Onde fica o talhão?</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
@@ -58,7 +46,23 @@
         <ul id="suggestions" class="suggestions" role="listbox" hidden></ul>
       </form>
       <button class="btn btn-glass btn-block" id="locateBtn" type="button"><span aria-hidden="true">📍</span> Usar minha localização</button>
+      <p class="sec-label">Marcar no mapa</p>
+      <div class="mode-row" role="group" aria-label="Como marcar no mapa">
+        <button type="button" class="chip is-active" id="modePoint" aria-pressed="true"><span aria-hidden="true">📌</span> Ponto</button>
+        <button type="button" class="chip" id="modeDraw" aria-pressed="false"><span aria-hidden="true">✏️</span> Desenhar área</button>
+      </div>
       <p class="field-summary" id="fieldSummary" aria-live="polite">Toque no mapa ou busque uma cidade.</p>
+    </section>
+
+    <section class="glass sheet" id="panel-map" aria-labelledby="t-map" inert>
+      <header class="sheet-head"><h2 id="t-map">Camadas do mapa</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
+      <div class="layer-grid" id="layerSwitch" role="radiogroup" aria-labelledby="t-map">
+        <button type="button" class="layer-opt is-active" role="radio" aria-checked="true" data-layer="esri"><strong>🛰️ Satélite Esri</strong><span>Alta resolução. A data da imagem varia (meses ou anos).</span></button>
+        <button type="button" class="layer-opt" role="radio" aria-checked="false" data-layer="s2"><strong>🌍 Sentinel-2 recente</strong><span>Mosaico dos últimos 30 dias, até 30% de nuvem. 10 m por pixel.</span></button>
+        <button type="button" class="layer-opt" role="radio" aria-checked="false" data-layer="ndvi"><strong>🌿 NDVI</strong><span>Vigor da vegetação (Sentinel-2, últimos 30 dias).</span></button>
+        <button type="button" class="layer-opt" role="radio" aria-checked="false" data-layer="streets"><strong>🗺️ Mapa de ruas</strong><span>Estradas, cidades e nomes de lugares.</span></button>
+      </div>
+      <p class="muted small">Onde não houver imagem limpa do Sentinel, o fundo da Esri aparece.</p>
     </section>
 
     <section class="glass sheet" id="panel-act" aria-labelledby="t-act" inert>
@@ -71,28 +75,32 @@
       <div id="resultBody" aria-live="polite"></div>
     </section>
 
-    <section class="glass sheet" id="panel-alerts" aria-labelledby="t-alerts" inert>
-      <header class="sheet-head"><h2 id="t-alerts">Alertas no navegador</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
-      <div class="perm" id="permBox"></div>
-      <form class="alert-form" id="alertForm">
-        <label class="sr-only" for="alertName">Nome do talhão</label>
-        <input id="alertName" type="text" maxlength="40" placeholder="Nome do talhão (ex.: Talhão 4)" autocomplete="off">
-        <button class="btn btn-primary btn-block" id="alertAdd" type="submit"><span aria-hidden="true">🔔</span> Criar alerta para este talhão</button>
-        <p class="muted small" id="alertHint"></p>
+    <section class="glass sheet" id="panel-fields" aria-labelledby="t-fields" inert>
+      <header class="sheet-head"><h2 id="t-fields">Meus talhões</h2><button class="close" type="button" data-close aria-label="Fechar">✕</button></header>
+      <form class="field-form" id="fieldForm">
+        <label class="sr-only" for="fieldName">Nome do talhão</label>
+        <input id="fieldName" type="text" maxlength="40" placeholder="Nome (ex.: Talhão 4)" autocomplete="off">
+        <button class="btn btn-primary btn-block" id="fieldAdd" type="submit"><span aria-hidden="true">💾</span> Salvar marcação atual</button>
+        <p class="muted small" id="fieldHint"></p>
       </form>
-      <ul class="alert-list" id="alertList"></ul>
-      <p class="muted small">Os avisos chegam enquanto o AgroNew estiver aberto no navegador (pode ser em outra aba ou minimizado). A checagem é feita a cada 30 minutos.</p>
+      <ul class="field-list" id="fieldList"></ul>
+      <details class="perm-box">
+        <summary>🔔 Avisos no navegador</summary>
+        <div class="perm" id="permBox"></div>
+        <p class="muted small">Ligue o sino de uma operação em cada talhão. Os avisos chegam enquanto o AgroNew estiver aberto no navegador (pode ser em outra aba ou minimizado), com checagem a cada 30 minutos.</p>
+      </details>
     </section>
   </div>
 
   <div class="toast glass" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <!-- Menu flutuante -->
+  <!-- Menu flutuante central -->
   <nav class="dock glass" aria-label="Menu">
     <button type="button" class="dock-btn" data-panel="local" aria-controls="panel-local" aria-expanded="false" id="dock-local"><span class="di" aria-hidden="true">📍</span><span>Local</span></button>
+    <button type="button" class="dock-btn" data-panel="map" aria-controls="panel-map" aria-expanded="false" id="dock-map"><span class="di" aria-hidden="true">🗺️</span><span>Mapa</span></button>
     <button type="button" class="dock-btn" data-panel="act" aria-controls="panel-act" aria-expanded="false" id="dock-act"><span class="di" aria-hidden="true">🌱</span><span>Operação</span></button>
     <button type="button" class="dock-btn" data-panel="result" aria-controls="panel-result" aria-expanded="false" id="dock-result"><span class="di" aria-hidden="true">✅</span><span>Resposta</span></button>
-    <button type="button" class="dock-btn" data-panel="alerts" aria-controls="panel-alerts" aria-expanded="false" id="dock-alerts"><span class="di" aria-hidden="true">🔔</span><span>Alertas</span></button>
+    <button type="button" class="dock-btn" data-panel="fields" aria-controls="panel-fields" aria-expanded="false" id="dock-fields"><span class="di" aria-hidden="true">🗂️</span><span>Talhões</span></button>
     <button type="button" class="dock-btn" id="helpBtn"><span class="di" aria-hidden="true">❔</span><span>Ajuda</span></button>
   </nav>
 
@@ -100,9 +108,11 @@
     <form method="dialog" class="dlg">
       <h2 id="helpTitle">Como funciona</h2>
       <ol class="help-list">
-        <li><b>Local.</b> Busque a cidade, use o GPS, toque no mapa ou desenhe a área.</li>
+        <li><b>Local.</b> Busque a cidade, use o GPS, marque um ponto ou desenhe a área.</li>
         <li><b>Operação.</b> Plantar, pulverizar, adubar ou colher.</li>
         <li><b>Resposta.</b> SIM ou NÃO, o motivo em uma frase, a próxima janela boa e o relatório em PDF.</li>
+        <li><b>Talhões.</b> Salve suas marcações e ligue os avisos de janela por operação.</li>
+        <li><b>Mapa.</b> Troque entre satélite Esri, Sentinel-2 recente, NDVI e ruas.</li>
       </ol>
       <h3>Como ler as cores</h3>
       <ul class="legend">

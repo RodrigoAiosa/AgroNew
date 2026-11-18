@@ -27,7 +27,7 @@
   const map = L.map('map', { zoomSnap: 0.5, zoomControl: false }).setView([-14.2, -51.9], 4);
   L.control.zoom({ position: 'topright', zoomInTitle: 'Aproximar', zoomOutTitle: 'Afastar' }).addTo(map);
   const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 18, attribution: 'Imagens © Esri, Maxar, Earthstar Geographics',
+    maxZoom: 19, maxNativeZoom: 17, attribution: 'Imagens © Esri, Maxar, Earthstar Geographics',
   }).addTo(map);
   const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '© OpenStreetMap',
@@ -118,7 +118,7 @@
     state.polygon = latlngs.map((p) => [p.lat, p.lng]);
     state.areaHa = polygonArea(latlngs);
     if (name !== undefined) state.name = name;
-    map.fitBounds(poly.getBounds(), { padding: [30, 30], animate: !reduceMotion });
+    map.fitBounds(poly.getBounds(), { padding: [30, 30], maxZoom: 17, animate: !reduceMotion });
     afterLocation();
   }
 

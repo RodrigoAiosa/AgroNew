@@ -219,3 +219,9 @@ dialog::backdrop { background: rgb(0 0 0 / .45); -webkit-backdrop-filter: blur(4
   .sheet { max-height: 70vh; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+.btn-danger { background: #b91c1c; color: #fff; border: 1.5px solid #f87171; }
+.btn-danger:disabled { opacity: .45; }
+#clearBtn { margin-top: .75rem; }
+.dlg-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .9rem; }
+#clearDialog .dlg { padding: 1.2rem; }

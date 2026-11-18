@@ -52,6 +52,7 @@
         <button type="button" class="chip" id="modeDraw" aria-pressed="false"><span aria-hidden="true">✏️</span> Desenhar área</button>
       </div>
       <p class="field-summary" id="fieldSummary" aria-live="polite">Toque no mapa ou busque uma cidade.</p>
+      <button class="btn btn-danger btn-block" id="clearBtn" type="button" disabled><span aria-hidden="true">🧹</span> Limpar marcações do mapa</button>
     </section>
 
     <section class="glass sheet" id="panel-map" aria-labelledby="t-map" inert>
@@ -103,6 +104,18 @@
     <button type="button" class="dock-btn" data-panel="fields" aria-controls="panel-fields" aria-expanded="false" id="dock-fields"><span class="di" aria-hidden="true">🗂️</span><span>Talhões</span></button>
     <button type="button" class="dock-btn" id="helpBtn"><span class="di" aria-hidden="true">❔</span><span>Ajuda</span></button>
   </nav>
+
+  <dialog id="clearDialog" class="glass" aria-labelledby="clearTitle">
+    <form method="dialog" class="dlg">
+      <h2 id="clearTitle">Limpar o mapa?</h2>
+      <p>Você tem certeza? Isso apaga o ponto ou a área marcada no mapa e a resposta atual.</p>
+      <p class="muted small">Os talhões que você já salvou na aba Talhões continuam guardados.</p>
+      <div class="dlg-actions">
+        <button class="btn btn-glass" value="cancel" autofocus>Não, voltar</button>
+        <button class="btn btn-danger" value="confirm" id="clearConfirm">Sim, limpar</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="helpDialog" class="glass" aria-labelledby="helpTitle">
     <form method="dialog" class="dlg">

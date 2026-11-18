@@ -274,6 +274,7 @@
 
   function updateSteps() {
     $('#dock-local').dataset.done = String(state.lat != null);
+    $('#clearBtn').disabled = state.lat == null;
     $('#dock-act').dataset.done = String(!!state.activity);
     $('#dock-result').dataset.done = String(!!(state.data && state.activity));
     updateFieldForm();
@@ -622,6 +623,21 @@
   $('#dock-fields').addEventListener('click', () => { renderFields(); setUnseen(0); });
 
   /* ------------------------------------------------------------------ ajuda */
+  /* ------------------------------------------------------------- limpar mapa */
+  function clearMap() {
+    stopDraw();
+    clearTimeout(refreshTimer);
+    if (state.controller) { try { state.controller.abort(); } catch { /* ok */ } }
+    state.reqId++;
+    fieldLayer.clearLayers(); marker = null;
+    state.lat = null; state.lon = null; state.name = ''; state.areaHa = null; state.polygon = null;
+    state.data = null; state.dataKey = null; state.stale = null;
+    updateTags(); updateSummary(); persist(); updateSteps(); renderEmpty();
+    closePanel(); toast('Marcações do mapa apagadas.');
+  }
+  $('#clearBtn').addEventListener('click', () => $('#clearDialog').showModal());
+  $('#clearDialog').addEventListener('close', () => { if ($('#clearDialog').returnValue === 'confirm') clearMap(); });
+
   $('#helpBtn').addEventListener('click', () => $('#helpDialog').showModal());
 
   /* --------------------------------------------------------- persistência */

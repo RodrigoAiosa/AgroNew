@@ -140,6 +140,66 @@ def fetch(lat: float, lon: float) -> dict[str, Any]:
     return data
 
 
+def demo_weather(lat: float, lon: float, scenario: str | None = None) -> dict[str, Any]:
+    """Dados sintéticos e determinísticos para testes e modo demonstração."""
+    scenario = scenario or os.environ.get("AGRONEW_DEMO_SCENARIO", "good")
+    n = (PAST_DAYS + FORECAST_DAYS) * 24
+    start = datetime(2026, 11, 15, 0, 0)
+    times = [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in range(n)]
+    now_idx = PAST_DAYS * 24 + 9  # 09:00 do dia 3
+
+    temp, rh, rain, prob, wind, gust, sm_s, sm_d, st, et0 = ([] for _ in range(10))
+    for h in range(n):
+        hod = h % 24
+        temp.append(round(21 + 7 * math.sin((hod - 9) / 24 * 2 * math.pi), 1))
+        rh.append(round(70 - 22 * math.sin((hod - 9) / 24 * 2 * math.pi)))
+        r = 0.0
+        p = 5
+        w = 7.0 + 2 * math.sin(hod / 24 * 2 * math.pi)
+        if scenario == "storm" and now_idx + 2 <= h <= now_idx + 5:
+            r, p = 6.0, 90
+            w = 24.0
+        if scenario == "windy":
+            w = 22.0
+        rain.append(r)
+        prob.append(p)
+        wind.append(round(w, 1))
+        gust.append(round(w * 1.5, 1))
+        wet = scenario == "wet"
+        sm_s.append(0.40 if wet else 0.22)
+        sm_d.append(0.47 if wet else 0.31)
+        st.append(round(24 + 3 * math.sin((hod - 10) / 24 * 2 * math.pi), 1))
+        et0.append(round(max(0.0, 0.3 * math.sin((hod - 6) / 12 * math.pi)), 2))
+    cur = {
+        "time": times[now_idx],
+        "temperature_2m": temp[now_idx],
+        "relative_humidity_2m": rh[now_idx],
+        "precipitation": rain[now_idx],
+        "wind_speed_10m": wind[now_idx],
+        "wind_gusts_10m": gust[now_idx],
+    }
+    return {
+        "lat": lat,
+        "lon": lon,
+        "elevation": 400,
+        "timezone": "America/Sao_Paulo",
+        "times": times,
+        "now_index": now_idx,
+        "current": {k: cur.get(k) for k in CURRENT_VARS},
+        "daily": {},
+        "temperature_2m": temp,
+        "relative_humidity_2m": rh,
+        "precipitation": rain,
+        "precipitation_probability": prob,
+        "wind_speed_10m": wind,
+        "wind_gusts_10m": gust,
+        "soil_moisture_0_to_1cm": sm_s,
+        "soil_moisture_9_to_27cm": sm_d,
+        "soil_temperature_6cm": st,
+        "et0_fao_evapotranspiration": et0,
+    }
+
+
 UF_TO_STATE = {
     "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
     "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás",

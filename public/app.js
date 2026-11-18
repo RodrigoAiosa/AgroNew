@@ -569,6 +569,7 @@
   const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : `há ${Math.round(m / 60)} h`; };
   function renderFields() {
     renderPerm(); updateFieldForm();
+    $('#clearFieldsBtn').disabled = !fields.length;
     const ul = $('#fieldList');
     if (!fields.length) { ul.innerHTML = '<li class="muted">Nenhum talhão salvo ainda. Marque no mapa e toque em “Salvar marcação atual”.</li>'; return; }
     ul.innerHTML = fields.map((f) => {
@@ -619,6 +620,14 @@
       if (f.polygon && f.polygon.length >= 3) setPolygon(f.polygon.map((p) => L.latLng(p[0], p[1])), f.name);
       else setPoint(L.latLng(f.lat, f.lon), f.name, { fly: true, zoom: 15 });
     }
+  });
+  $('#clearFieldsBtn').addEventListener('click', () => {
+    $('#clearFieldsText').textContent = `Você tem certeza? ${fields.length} talhão(ões) salvo(s) e os avisos ligados serão apagados.`;
+    $('#clearFieldsDialog').showModal();
+  });
+  $('#clearFieldsDialog').addEventListener('close', () => {
+    if ($('#clearFieldsDialog').returnValue !== 'confirm') return;
+    fields = []; saveFields(); renderFields(); toast('Todos os talhões foram apagados.');
   });
   $('#dock-fields').addEventListener('click', () => { renderFields(); setUnseen(0); });
 

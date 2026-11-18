@@ -85,6 +85,7 @@
         <p class="muted small" id="fieldHint"></p>
       </form>
       <ul class="field-list" id="fieldList"></ul>
+      <button class="btn btn-danger btn-block" id="clearFieldsBtn" type="button" disabled><span aria-hidden="true">🗑️</span> Apagar todos os talhões salvos</button>
       <details class="perm-box">
         <summary>🔔 Avisos no navegador</summary>
         <div class="perm" id="permBox"></div>
@@ -113,6 +114,18 @@
       <div class="dlg-actions">
         <button class="btn btn-glass" value="cancel" autofocus>Não, voltar</button>
         <button class="btn btn-danger" value="confirm" id="clearConfirm">Sim, limpar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="clearFieldsDialog" class="glass" aria-labelledby="clearFieldsTitle">
+    <form method="dialog" class="dlg">
+      <h2 id="clearFieldsTitle">Apagar todos os talhões?</h2>
+      <p id="clearFieldsText">Você tem certeza? Todos os talhões salvos e os avisos ligados serão apagados.</p>
+      <p class="muted small">Esta ação não pode ser desfeita.</p>
+      <div class="dlg-actions">
+        <button class="btn btn-glass" value="cancel" autofocus>Não, voltar</button>
+        <button class="btn btn-danger" value="confirm" id="clearFieldsConfirm">Sim, apagar</button>
       </div>
     </form>
   </dialog>

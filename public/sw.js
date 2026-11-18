@@ -1,7 +1,7 @@
 /* Service worker mínimo: o app abre mesmo com sinal fraco.
    - Arquivos estáticos: cache primeiro (atualiza em segundo plano).
    - /api e tiles de mapa: sempre rede (o app já guarda a última resposta no aparelho). */
-const CACHE = 'agronew-shell-v7';
+const CACHE = 'agronew-shell-v8';
 const SHELL = [
   './', 'index.html', 'styles.css', 'app.js', 'icon.svg', 'manifest.webmanifest',
   'vendor/leaflet/leaflet.css', 'vendor/leaflet/leaflet.js',

@@ -6,6 +6,7 @@ OPEN_METEO_API_KEY (o app passa a usar customer-api.open-meteo.com).
 from __future__ import annotations
 
 import math
+import re
 import os
 import threading
 import time
@@ -262,6 +263,9 @@ def geocode(text: str, count: int = 6) -> list[dict[str, Any]]:
         results += [r for r in _query_geocoder(name, 10, None) if r.get("country_code") != "BR"]
     items, seen = [], set()
     for r in results:
+        if r.get("feature_code") in ("AIRP", "AIRF", "AIRH", "AIRB") or re.search(
+                r"\b(airport|aeroporto|aerodromo|aeródromo)\b", r.get("name") or "", re.I):
+            continue  # aeroportos não servem para marcar talhão
         key = (r.get("latitude") and round(r["latitude"], 2), r.get("longitude") and round(r["longitude"], 2))
         if key in seen:
             continue

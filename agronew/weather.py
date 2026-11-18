@@ -36,7 +36,8 @@ CURRENT_VARS = [
 PAST_DAYS = 2
 FORECAST_DAYS = 4
 CACHE_TTL_S = 600
-TIMEOUT_S = 8
+TIMEOUT_S = (5, 9)  # (conexão, leitura) por tentativa
+ATTEMPTS = 2
 
 _cache: dict[tuple, tuple[float, dict]] = {}
 _lock = threading.Lock()
@@ -114,12 +115,23 @@ def fetch(lat: float, lon: float) -> dict[str, Any]:
         "forecast_days": FORECAST_DAYS,
         **extra,
     }
-    try:
-        resp = requests.get(url, params=params, timeout=TIMEOUT_S)
-        resp.raise_for_status()
-        data = normalize(resp.json())
-    except (requests.RequestException, ValueError) as exc:
-        raise WeatherError(f"Não foi possível obter o clima: {exc}") from exc
+    last_exc: Exception | None = None
+    data = None
+    for attempt in range(ATTEMPTS):
+        try:
+            resp = requests.get(url, params=params, timeout=TIMEOUT_S)
+            resp.raise_for_status()
+            data = normalize(resp.json())
+            break
+        except (requests.RequestException, ValueError) as exc:
+            last_exc = exc
+            if attempt + 1 < ATTEMPTS:
+                time.sleep(0.5)
+    if data is None:
+        raise WeatherError(
+            "O serviço de clima (Open-Meteo) demorou demais para responder. "
+            "Isso costuma passar em instantes: toque em Tentar de novo."
+        ) from last_exc
 
     with _lock:
         _cache[key] = (now, data)

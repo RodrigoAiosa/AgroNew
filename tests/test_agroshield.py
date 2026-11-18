@@ -113,3 +113,25 @@ def test_inbound_sms(client):
 
 def test_sms_send_route_removed(client):
     assert client.post('/api/sms/send', json={}).status_code in (404, 405)
+
+
+def test_geocode_brasil_primeiro(monkeypatch):
+    from agronew import weather as w
+    monkeypatch.delenv("AGRONEW_DEMO", raising=False)
+    bolivia = {"name": "Jequie", "admin1": "Pando", "country": "Bolívia", "country_code": "BO",
+               "latitude": -11.0, "longitude": -68.0}
+    jequie = {"name": "Jequié", "admin1": "Bahia", "country": "Brasil", "country_code": "BR",
+              "latitude": -13.85, "longitude": -40.08}
+    outra = {"name": "Jequié", "admin1": "Minas Gerais", "country": "Brasil", "country_code": "BR",
+             "latitude": -19.0, "longitude": -44.0}
+
+    def fake(name, count, country):
+        return [jequie, outra] if country == "BR" else [bolivia, jequie]
+
+    monkeypatch.setattr(w, "_query_geocoder", fake)
+    res = w.geocode("Jequié")
+    assert res[0]["uf"] == "BA" and res[0]["country_code"] == "BR"
+    assert res[-1]["country_code"] == "BO"
+    assert len(res) == 3  # sem duplicar Jequié (BA)
+    assert w.geocode("Jequié MG")[0]["uf"] == "MG"
+    assert w.resolve_place("Jequié BA")["uf"] == "BA"

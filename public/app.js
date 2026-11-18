@@ -190,7 +190,11 @@
   const COORD_RE = /^\s*(-?\d{1,2}(?:[.,]\d+)?)\s*[;,\s]\s*(-?\d{1,3}(?:[.,]\d+)?)\s*$/;
 
   function hideSug() { sug.hidden = true; sug.innerHTML = ''; q.setAttribute('aria-expanded', 'false'); }
-  function placeLabel(r) { return r.admin1 ? `${r.name} - ${r.admin1}` : r.name; }
+  const isBR = (r) => r.country_code === 'BR';
+  function placeLabel(r) {
+    const place = r.admin1 ? `${r.name} - ${r.admin1}` : r.name;
+    return isBR(r) || !r.country ? place : `${place}, ${r.country}`;
+  }
   function pickPlace(r) {
     hideSug();
     q.value = placeLabel(r);
@@ -209,7 +213,7 @@
       try {
         sugResults = await fetchPlaces(v);
         if (!sugResults.length) return hideSug();
-        sug.innerHTML = sugResults.map((r, i) => `<li role="option"><button type="button" data-i="${i}">${esc(r.name)}<small>${esc([r.admin1, r.country].filter(Boolean).join(' · '))}</small></button></li>`).join('');
+        sug.innerHTML = sugResults.map((r, i) => `<li role="option"><button type="button" data-i="${i}">${esc(r.name)}<small>${esc([r.admin1, isBR(r) ? '' : r.country].filter(Boolean).join(' · '))}</small></button></li>`).join('');
         sug.hidden = false; q.setAttribute('aria-expanded', 'true');
       } catch { hideSug(); }
     }, 300);

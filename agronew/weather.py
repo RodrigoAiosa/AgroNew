@@ -140,99 +140,6 @@ def fetch(lat: float, lon: float) -> dict[str, Any]:
     return data
 
 
-def geocode(name: str, count: int = 5) -> list[dict[str, Any]]:
-    """Busca de cidades (Open-Meteo Geocoding), priorizando o Brasil."""
-    name = (name or "").strip()
-    if len(name) < 2:
-        return []
-    if os.environ.get("AGRONEW_DEMO") == "1":
-        return [{"name": name.title(), "admin1": "MT", "country": "Brasil",
-                 "lat": -12.5453, "lon": -55.7211}]
-    try:
-        resp = requests.get(
-            "https://geocoding-api.open-meteo.com/v1/search",
-            params={"name": name, "count": count, "language": "pt", "format": "json"},
-            timeout=TIMEOUT_S,
-        )
-        resp.raise_for_status()
-        results = resp.json().get("results") or []
-    except (requests.RequestException, ValueError):
-        return []
-    items = [
-        {
-            "name": r.get("name"),
-            "admin1": r.get("admin1"),
-            "country": r.get("country"),
-            "country_code": r.get("country_code"),
-            "lat": r.get("latitude"),
-            "lon": r.get("longitude"),
-        }
-        for r in results
-    ]
-    items.sort(key=lambda r: 0 if r.get("country_code") == "BR" else 1)
-    return items
-
-
-def demo_weather(lat: float, lon: float, scenario: str | None = None) -> dict[str, Any]:
-    """Dados sintéticos e determinísticos para testes e modo demonstração."""
-    scenario = scenario or os.environ.get("AGRONEW_DEMO_SCENARIO", "good")
-    n = (PAST_DAYS + FORECAST_DAYS) * 24
-    start = datetime(2026, 11, 15, 0, 0)
-    times = [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in range(n)]
-    now_idx = PAST_DAYS * 24 + 9  # 09:00 do dia 3
-
-    temp, rh, rain, prob, wind, gust, sm_s, sm_d, st, et0 = ([] for _ in range(10))
-    for h in range(n):
-        hod = h % 24
-        temp.append(round(21 + 7 * math.sin((hod - 9) / 24 * 2 * math.pi), 1))
-        rh.append(round(70 - 22 * math.sin((hod - 9) / 24 * 2 * math.pi)))
-        r = 0.0
-        p = 5
-        w = 7.0 + 2 * math.sin(hod / 24 * 2 * math.pi)
-        if scenario == "storm" and now_idx + 2 <= h <= now_idx + 5:
-            r, p = 6.0, 90
-            w = 24.0
-        if scenario == "windy":
-            w = 22.0
-        rain.append(r)
-        prob.append(p)
-        wind.append(round(w, 1))
-        gust.append(round(w * 1.5, 1))
-        wet = scenario == "wet"
-        sm_s.append(0.40 if wet else 0.22)
-        sm_d.append(0.47 if wet else 0.31)
-        st.append(round(24 + 3 * math.sin((hod - 10) / 24 * 2 * math.pi), 1))
-        et0.append(round(max(0.0, 0.3 * math.sin((hod - 6) / 12 * math.pi)), 2))
-    cur = {
-        "time": times[now_idx],
-        "temperature_2m": temp[now_idx],
-        "relative_humidity_2m": rh[now_idx],
-        "precipitation": rain[now_idx],
-        "wind_speed_10m": wind[now_idx],
-        "wind_gusts_10m": gust[now_idx],
-    }
-    return {
-        "lat": lat,
-        "lon": lon,
-        "elevation": 400,
-        "timezone": "America/Sao_Paulo",
-        "times": times,
-        "now_index": now_idx,
-        "current": {k: cur.get(k) for k in CURRENT_VARS},
-        "daily": {},
-        "temperature_2m": temp,
-        "relative_humidity_2m": rh,
-        "precipitation": rain,
-        "precipitation_probability": prob,
-        "wind_speed_10m": wind,
-        "wind_gusts_10m": gust,
-        "soil_moisture_0_to_1cm": sm_s,
-        "soil_moisture_9_to_27cm": sm_d,
-        "soil_temperature_6cm": st,
-        "et0_fao_evapotranspiration": et0,
-    }
-
-
 UF_TO_STATE = {
     "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
     "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás",
@@ -249,25 +156,71 @@ def _strip_accents(s: str) -> str:
     import unicodedata
     return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
 
+STATE_TO_UF = {_strip_accents(v): k for k, v in UF_TO_STATE.items()}
 
-def resolve_place(text: str) -> dict[str, Any] | None:
-    """Resolve 'Sorriso MT' / 'Lucas do Rio Verde' para o melhor resultado.
 
-    Se o texto termina com uma sigla de UF, ela é usada para escolher entre
-    cidades homônimas.
+def _split_uf(text: str) -> tuple[str, str | None]:
+    """'Jequié BA' / 'Jequié - BA' / 'Jequié, BA' -> ('Jequié', 'BA')."""
+    cleaned = text.replace(",", " ").replace(" - ", " ").replace("-", " ").split()
+    if len(cleaned) > 1 and cleaned[-1].upper() in UF_TO_STATE:
+        return " ".join(cleaned[:-1]), cleaned[-1].upper()
+    return text.strip(), None
+
+
+def _query_geocoder(name: str, count: int, country: str | None) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"name": name, "count": count, "language": "pt", "format": "json"}
+    if country:
+        params["countryCode"] = country
+    try:
+        resp = requests.get("https://geocoding-api.open-meteo.com/v1/search",
+                            params=params, timeout=TIMEOUT_S)
+        resp.raise_for_status()
+        return resp.json().get("results") or []
+    except (requests.RequestException, ValueError):
+        return []
+
+
+def geocode(text: str, count: int = 6) -> list[dict[str, Any]]:
+    """Busca de cidades (Open-Meteo Geocoding). Brasil sempre vem primeiro.
+
+    Aceita "Cidade UF" (a UF escolhe entre homônimas). Resultados de outros países só
+    entram depois dos brasileiros, para "Jequié" não listar o povoado da Bolívia antes.
     """
     text = (text or "").strip()
-    if not text:
-        return None
-    parts = text.split()
-    uf = parts[-1].upper() if len(parts) > 1 and parts[-1].upper() in UF_TO_STATE else None
-    name = " ".join(parts[:-1]) if uf else text
-    results = geocode(name, count=10)
-    if not results:
-        return None
+    if len(text) < 2:
+        return []
+    name, uf = _split_uf(text)
+    if os.environ.get("AGRONEW_DEMO") == "1":
+        return [{"name": name.title(), "admin1": "MT", "uf": uf or "MT", "country": "Brasil",
+                 "country_code": "BR", "lat": -12.5453, "lon": -55.7211}]
+    br = _query_geocoder(name, 20, "BR")
     if uf:
         want = _strip_accents(UF_TO_STATE[uf])
-        for r in results:
-            if _strip_accents(r.get("admin1") or "") == want:
-                return r
-    return results[0]
+        br = [r for r in br if _strip_accents(r.get("admin1") or "") == want] or br
+    results = list(br)
+    if len(results) < count:  # completa com o resto do mundo, depois dos brasileiros
+        results += [r for r in _query_geocoder(name, 10, None) if r.get("country_code") != "BR"]
+    items, seen = [], set()
+    for r in results:
+        key = (r.get("latitude") and round(r["latitude"], 2), r.get("longitude") and round(r["longitude"], 2))
+        if key in seen:
+            continue
+        seen.add(key)
+        is_br = r.get("country_code") == "BR"
+        state_uf = STATE_TO_UF.get(_strip_accents(r.get("admin1") or "")) if is_br else None
+        items.append({
+            "name": r.get("name"),
+            "admin1": state_uf or r.get("admin1"),
+            "uf": state_uf,
+            "country": r.get("country"),
+            "country_code": r.get("country_code"),
+            "lat": r.get("latitude"),
+            "lon": r.get("longitude"),
+        })
+    return items[:count]
+
+
+def resolve_place(text: str) -> dict[str, Any] | None:
+    """Resolve 'Sorriso MT' / 'Lucas do Rio Verde' para o melhor resultado."""
+    results = geocode(text, count=10)
+    return results[0] if results else None
